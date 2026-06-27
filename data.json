@@ -1,0 +1,112 @@
+{
+  "empresas": [
+    {
+      "nombre": "Fundo Santa Elena",
+      "ruc": "20123456789",
+      "hectareas": 150,
+      "ubicacion": "Chincha, Ica",
+      "cultivo": "Espárragos",
+      "estado_hidrico": "Óptimo",
+      "reservorios": "3 (45,000 m³)",
+      "historial_caudal": [12.5, 14.2, 13.8, 15.1, 16.0]
+    },
+    {
+      "nombre": "Agrícola Don Ricardo",
+      "ruc": "20567891234",
+      "hectareas": 85,
+      "ubicacion": "Nazca, Ica",
+      "cultivo": "Paltas Hass",
+      "estado_hidrico": "Bueno",
+      "reservorios": "2 (28,000 m³)",
+      "historial_caudal": [8.9, 9.5, 10.2, 9.8, 11.1]
+    },
+    {
+      "nombre": "Fundo Los Pinos",
+      "ruc": "20345678912",
+      "hectareas": 220,
+      "ubicacion": "Pisco, Ica",
+      "cultivo": "Uvas de Mesa Superior Seedless",
+      "estado_hidrico": "Excelente",
+      "reservorios": "4 (72,000 m³)",
+      "historial_caudal": [18.7, 20.1, 19.5, 21.3, 22.0]
+    },
+    {
+      "nombre": "Agroexportadora del Sur",
+      "ruc": "20456789123",
+      "hectareas": 450,
+      "ubicacion": "Camaná, Arequipa",
+      "cultivo": "Mango Kent",
+      "estado_hidrico": "Regular",
+      "reservorios": "5 (120,000 m³)",
+      "historial_caudal": [25.4, 23.8, 24.2, 26.1, 27.5]
+    },
+    {
+      "nombre": "Fundo La Esperanza",
+      "ruc": "20678912345",
+      "hectareas": 95,
+      "ubicacion": "Chala, Arequipa",
+      "cultivo": "Algodón Pima",
+      "estado_hidrico": "Óptimo",
+      "reservorios": "2 (35,000 m³)",
+      "historial_caudal": [10.2, 11.8, 12.4, 11.5, 13.0]
+    }
+  ],
+  "parceleros": [
+    {
+      "nombre": "Juan Pérez Huamán",
+      "dni": "45678901",
+      "hectareas": 4.5,
+      "sector": "Sector A - Chincha Baja",
+      "cultivo": "Maíz Chulpi"
+    },
+    {
+      "nombre": "Carlos Ramos Quispe",
+      "dni": "47891234",
+      "hectareas": 3.2,
+      "sector": "Sector B - Grocio Prado",
+      "cultivo": "Papa Canchán"
+    },
+    {
+      "nombre": "Ana Torres Mendoza",
+      "dni": "48912345",
+      "hectareas": 6.8,
+      "sector": "Sector C - Pueblo Nuevo",
+      "cultivo": "Tomate Cherry"
+    },
+    {
+      "nombre": "Luis Quispe Mamani",
+      "dni": "49123456",
+      "hectareas": 2.1,
+      "sector": "Sector A - El Carmen",
+      "cultivo": "Arroz Pilado"
+    }
+  ],
+  "configuracion": {
+    "tarifa_hectarea": 40,
+    "necesidad_diaria_mm": 7,
+    "conversion_lps_m3h": 3.6,
+    "campaña_meses": 2,
+    "alertas": {
+      "riesgo_sequia": 15,
+      "deficit_critico": 2500
+    }
+  },
+  "historico_ejemplo": [
+    {
+      "fecha": "2024-01-15 09:30",
+      "empresa": "Fundo Santa Elena",
+      "lps": 12.5,
+      "m3_hora": 45.0,
+      "m3_dia": 1080,
+      "estado": "Normal"
+    },
+    {
+      "fecha": "2024-01-14 14:20",
+      "empresa": "Fundo Santa Elena",
+      "lps": 14.2,
+      "m3_hora": 51.1,
+      "m3_dia": 1226,
+      "estado": "Óptimo"
+    }
+  ]
+}
