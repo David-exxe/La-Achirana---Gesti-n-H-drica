@@ -257,6 +257,7 @@ Si prefieres crear todo a mano (sin Blueprint):
 - **El plan gratuito de Render tiene límites:**
   - El servicio web se duerme tras 15 minutos sin visitas; la primera carga después tarda unos segundos.
   - La base de datos gratuita vence a los 30 días.
+- **Datos de demostración:** con `SEMBRAR_DEMO=true`, al arrancar con la base vacía se cargan datos **ficticios**: 30 parceleros (DNI 99xxxxxx), 10 fundos (RUC 20999xxxxxx), 60 días de lecturas, pagos, lecturas del canal y 6 meses de movimientos. Sirven para presentar el sistema; no corresponden a personas ni empresas reales. Con datos reales de la Junta, pon `SEMBRAR_DEMO=false`.
 - **Modo demostración:** `PAGOS_DEMO=true` deja activos los cobros simulados con tarjeta y Yape. Para cobrar de verdad, agrega las llaves de Culqi (`CULQI_PUBLIC_KEY`, `CULQI_SECRET_KEY`) y pon `PAGOS_DEMO=false`.
 - **HTTPS:** Render lo da automáticamente. El sistema detecta la dirección pública con `RENDER_EXTERNAL_URL`.
 

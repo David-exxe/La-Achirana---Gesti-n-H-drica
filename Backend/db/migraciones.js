@@ -382,6 +382,10 @@ async function aplicarMigraciones() {
     await crearAdminInicial();
     await crearGerenteInicial();
     await sembrarDatosBase();
+    if (String(process.env.SEMBRAR_DEMO).toLowerCase() === 'true') {
+        const r = await require('./demo').sembrarDemo();
+        if (!r.omitido) console.log(`   🌱 Datos de demostración: ${r.clientes} regantes, ${r.lecturas} lecturas, ${r.pagos} pagos, ${r.movimientos} movimientos.`);
+    }
 }
 
 /** Convierte contraseñas guardadas en texto plano a hash scrypt. */

@@ -31,3 +31,5 @@ services:
         sync: false
       - key: PAGOS_DEMO
         value: "true"     # cobros simulados para presentar; pon "false" al cobrar de verdad
+      - key: SEMBRAR_DEMO
+        value: "true"     # carga 40 regantes ficticios si la base está vacía; pon "false" con datos reales
