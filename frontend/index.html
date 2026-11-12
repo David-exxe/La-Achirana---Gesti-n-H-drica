@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Achirana · Gestión hídrica</title>
+    <meta name="description" content="Junta de Usuarios La Achirana: consumo de agua, pago del canon hídrico y alertas de lluvia en la sierra.">
+    <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <link rel="stylesheet" href="css/styles.css">
+
+    <!-- El tema se aplica antes de pintar para evitar parpadeo -->
+    <script src="js/tema.js"></script>
+</head>
+<body>
+
+<!-- =================================================================
+     LOGIN
+     ================================================================= -->
+<div id="vista-login" class="login">
+    <section class="login-arte" aria-hidden="false">
+        <div class="marca">
+            <img src="img/logo.svg" alt="" class="marca-logo">
+            <div>
+                <div class="marca-nombre">La Achirana</div>
+                <div class="marca-sub">Junta de Usuarios de Riego · Ica</div>
+            </div>
+        </div>
+
+        <div class="login-titular">
+            <h1>Del agua que nace en Huancavelica al surco de tu chacra.</h1>
+            <p>Consulta tu consumo, paga tu canon hídrico y entérate a tiempo cuando llueve en la sierra y el río empieza a bajar.</p>
+        </div>
+
+        <div class="login-pie">
+            <div><strong>4 550 m</strong>Laguna Choclococha</div>
+            <div><strong>528 m</strong>Bocatoma La Achirana</div>
+            <div><strong>Siglo XV</strong>Canal de origen inca</div>
+        </div>
+
+        <svg class="perfil-login" viewBox="0 0 800 300" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+                <linearGradient id="gradLogin" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#3fc1c9" stop-opacity=".22"/>
+                    <stop offset="1" stop-color="#3fc1c9" stop-opacity="0"/>
+                </linearGradient>
+            </defs>
+            <path d="M0,40 C80,30 120,70 190,80 S300,120 360,150 S470,200 540,222 S680,250 800,258 L800,300 L0,300 Z" fill="url(#gradLogin)"/>
+            <path d="M0,40 C80,30 120,70 190,80 S300,120 360,150 S470,200 540,222 S680,250 800,258" fill="none" stroke="#3fc1c9" stroke-width="2" stroke-opacity=".8"/>
+            <path d="M0,110 C120,100 200,140 300,170 S520,240 800,280" fill="none" stroke="#e3b866" stroke-width="1" stroke-opacity=".35" stroke-dasharray="4 6"/>
+        </svg>
+    </section>
+
+    <section class="login-form-lado">
+        <div class="login-card">
+            <div>
+                <h2>Ingresar</h2>
+                <p class="muted">Elige cómo vas a entrar.</p>
+            </div>
+
+            <div class="segmented" role="group" aria-label="Tipo de acceso">
+                <button type="button" data-modo="cliente" aria-pressed="true"><i class="fa-solid fa-seedling"></i> Soy regante</button>
+                <button type="button" data-modo="admin" aria-pressed="false"><i class="fa-solid fa-user-shield"></i> Personal de la Junta</button>
+            </div>
+
+            <!-- Regante -->
+            <form id="form-login-cliente" class="form-grid" novalidate>
+                <div class="field">
+                    <label for="lc-tipo">Documento</label>
+                    <select id="lc-tipo" name="tipoDoc" class="select">
+                        <option value="DNI">DNI (parcelero)</option>
+                        <option value="RUC">RUC (fundo o empresa)</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="lc-doc">Número de DNI</label>
+                    <input id="lc-doc" name="documento" class="input mono" inputmode="numeric" autocomplete="username"
+                           data-validar="dni" maxlength="8" placeholder="8 dígitos" required>
+                    <span class="error" data-error-de="documento"></span>
+                </div>
+                <div class="field">
+                    <label for="lc-pin">Código de acceso <span class="muted">(si la Junta te asignó uno)</span></label>
+                    <div class="input-wrap">
+                        <input id="lc-pin" name="pin" type="password" class="input mono" inputmode="numeric" autocomplete="current-password"
+                               data-validar="pin-opcional" maxlength="6" placeholder="6 dígitos">
+                        <button type="button" class="icon-btn" data-ver-clave="lc-pin" aria-label="Mostrar código"><i class="fa-regular fa-eye"></i></button>
+                    </div>
+                    <span class="error" data-error-de="pin"></span>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block"><i class="fa-solid fa-droplet"></i> Ver mi consumo</button>
+            </form>
+
+            <!-- Personal -->
+            <form id="form-login-admin" class="form-grid hidden" novalidate>
+                <div class="field">
+                    <label for="la-email">Correo</label>
+                    <input id="la-email" name="email" type="email" class="input" autocomplete="username"
+                           data-validar="email" maxlength="100" placeholder="nombre@dominio.com" required>
+                    <span class="error" data-error-de="email"></span>
+                </div>
+                <div class="field">
+                    <label for="la-pass">Contraseña</label>
+                    <div class="input-wrap">
+                        <input id="la-pass" name="pass" type="password" class="input" autocomplete="current-password"
+                               data-validar="requerido" maxlength="72" required>
+                        <button type="button" class="icon-btn" data-ver-clave="la-pass" aria-label="Mostrar contraseña"><i class="fa-regular fa-eye"></i></button>
+                    </div>
+                    <span class="error" data-error-de="pass"></span>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block"><i class="fa-solid fa-right-to-bracket"></i> Ingresar al panel</button>
+            </form>
+
+            <p class="small muted"><i class="fa-solid fa-lock"></i> Conexión protegida. Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.</p>
+        </div>
+    </section>
+    <button type="button" class="icon-btn tema-flotante" data-accion="tema" aria-label="Cambiar tema claro/oscuro"><i class="fa-solid fa-circle-half-stroke"></i></button>
+</div>
+
+<!-- =================================================================
+     APLICACIÓN
+     ================================================================= -->
+<div id="vista-app" class="app hidden">
+    <aside class="sidebar" id="sidebar">
+        <div class="marca">
+            <img src="img/logo.svg" alt="" class="marca-logo">
+            <div>
+                <div class="marca-nombre">La Achirana</div>
+                <div class="marca-sub" style="color:var(--text-3)">Gestión hídrica</div>
+            </div>
+        </div>
+
+        <nav class="nav" aria-label="Secciones">
+            <button type="button" data-ir="inicio"><i class="fa-solid fa-water"></i> Mi agua</button>
+            <button type="button" data-ir="turnos"><i class="fa-solid fa-clock-rotate-left"></i> Turnos de riego</button>
+            <button type="button" data-ir="clima"><i class="fa-solid fa-cloud-showers-heavy"></i> Lluvias en la sierra <span class="badge-dot" id="nav-dot-clima"></span></button>
+            <button type="button" data-ir="pagos"><i class="fa-solid fa-receipt"></i> Pagos y comprobantes</button>
+            <button type="button" data-ir="analisis"><i class="fa-solid fa-chart-line"></i> Análisis de caudal</button>
+            <div class="nav-sep solo-gestion">Gerencia</div>
+            <button type="button" data-ir="gerencia" class="solo-gestion"><i class="fa-solid fa-chart-pie"></i> Tablero gerencial</button>
+            <div class="nav-sep solo-admin">Administración</div>
+            <button type="button" data-ir="admin" class="solo-admin"><i class="fa-solid fa-sliders"></i> Panel de control</button>
+        </nav>
+
+        <div class="sidebar-pie">
+            <div class="usuario-mini">
+                <div class="avatar" id="usuario-avatar">–</div>
+                <div>
+                    <div class="nombre" id="usuario-nombre">–</div>
+                    <div class="rol" id="usuario-rol">–</div>
+                </div>
+            </div>
+            <div class="sidebar-acciones">
+                <button type="button" class="btn btn-ghost btn-sm" data-accion="tema" aria-label="Cambiar tema"><i class="fa-solid fa-circle-half-stroke"></i> Tema</button>
+                <button type="button" class="btn btn-danger btn-sm" data-accion="salir"><i class="fa-solid fa-arrow-right-from-bracket"></i> Salir</button>
+            </div>
+        </div>
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <button type="button" class="icon-btn menu-btn" data-accion="menu" aria-label="Abrir menú"><i class="fa-solid fa-bars"></i></button>
+            <div class="selector-cliente solo-admin">
+                <label for="sel-cliente" class="sr-only">Cliente</label>
+                <i class="fa-solid fa-tractor muted"></i>
+                <select id="sel-cliente" class="select"></select>
+            </div>
+            <div class="selector-cliente solo-cliente">
+                <strong id="top-cliente-nombre"></strong>
+            </div>
+            <div class="topbar-derecha">
+                <span class="chip agua sin-punto hidden" id="chip-simulacion"><i class="fa-solid fa-flask"></i> Clima simulado</span>
+            </div>
+        </header>
+
+        <button type="button" class="alerta-franja" id="alerta-franja" data-ir="clima" data-nivel="verde">
+            <span class="nivel-icono" id="alerta-icono"><i class="fa-solid fa-mountain-sun"></i></span>
+            <strong id="alerta-titulo">Consultando lluvias en la sierra…</strong>
+            <span class="muted" id="alerta-texto"></span>
+            <span class="ver">Ver detalle</span>
+        </button>
+
+        <main class="contenido" id="contenido">
+
+            <!-- ============ MI AGUA ============ -->
+            <section data-vista="inicio" class="stack">
+                <div class="vista-cabecera">
+                    <div>
+                        <h1 id="inicio-titulo">Mi agua</h1>
+                        <p id="inicio-sub">Lecturas del hidrómetro y lo que tienes pendiente de pago.</p>
+                    </div>
+                </div>
+
+                <div class="panel metricas" id="metricas-cliente">
+                    <div class="metrica"><div class="etq">Área bajo riego</div><div class="val" id="m-ha">–</div><div class="sub" id="m-cultivo">–</div></div>
+                    <div class="metrica"><div class="etq">Último caudal</div><div class="val" id="m-lps">–</div><div class="sub" id="m-lps-fecha">–</div></div>
+                    <div class="metrica"><div class="etq">Volumen pendiente</div><div class="val" id="m-pend">–</div><div class="sub" id="m-pend-sub">–</div></div>
+                    <div class="metrica destacada"><div class="etq" id="m-quinta-etq">Por pagar</div><div class="val" id="m-deuda">–</div><div class="sub" id="m-deuda-sub">–</div></div>
+                </div>
+
+                <div class="grid-side">
+                    <div class="stack">
+                        <div class="panel" id="panel-mi-turno">
+                            <div class="panel-cab"><h2>Turno de riego de hoy</h2><button type="button" class="btn btn-ghost btn-sm" data-ir="turnos">Ver horario</button></div>
+                            <div class="panel-cuerpo" id="mi-turno"><p class="muted small">Cargando…</p></div>
+                        </div>
+                        <!-- Pago (cliente y admin) -->
+                        <div class="panel" id="panel-pago">
+                            <div class="panel-cab"><h2>Pagar canon hídrico</h2><span class="muted" id="pago-tarifa">–</span></div>
+                            <div class="panel-cuerpo stack" style="gap:16px">
+                                <div class="cuenta" id="pago-cuenta"></div>
+                                <div class="field">
+                                    <span class="label">Comprobante</span>
+                                    <div class="segmented" role="group" aria-label="Tipo de comprobante" id="pago-tipo">
+                                        <button type="button" data-tipo="BOLETA" aria-pressed="true">Boleta</button>
+                                        <button type="button" data-tipo="FACTURA" aria-pressed="false">Factura</button>
+                                    </div>
+                                    <span class="hint" id="pago-tipo-hint">La factura requiere RUC.</span>
+                                </div>
+                                <div id="pago-aviso"></div>
+                                <div class="medios-mini" aria-hidden="true">
+                                    <span class="medio-logo yape">Yape</span><span class="medio-logo plin">Plin</span>
+                                    <span class="medio-logo bcp">BCP</span><span class="medio-logo ibk">Interbank</span><span class="medio-logo bbva">BBVA</span>
+                                </div>
+                                <button type="button" class="btn btn-arena btn-block" id="btn-pagar"><i class="fa-solid fa-mobile-screen-button"></i> Pagar con Yape, Plin o banco</button>
+                                <button type="button" class="btn btn-ghost btn-block solo-admin" id="btn-pago-caja"><i class="fa-solid fa-cash-register"></i> Registrar pago en caja</button>
+                                <div class="mp-sello"><i class="fa-solid fa-shield-halved"></i> Pagas desde tu app; la Junta valida tu voucher y emite tu comprobante.</div>
+                            </div>
+                        </div>
+
+                        <!-- Registrar caudal (personal) -->
+                        <form class="panel solo-personal" id="form-caudal" novalidate>
+                            <div class="panel-cab"><h2>Registrar lectura</h2><span class="muted">Hidrómetro</span></div>
+                            <div class="panel-cuerpo form-grid">
+                                <div class="field">
+                                    <label for="fc-lps">Caudal (L/s)</label>
+                                    <input id="fc-lps" name="lps" class="input mono" inputmode="decimal" data-validar="lps" placeholder="Ej. 14.50" required>
+                                    <span class="hint" id="fc-conv">Se convierte a m³/h y m³/día automáticamente.</span>
+                                    <span class="error" data-error-de="lps"></span>
+                                </div>
+                                <div class="field">
+                                    <label for="fc-fecha">Fecha y hora de la lectura <span class="muted">(opcional)</span></label>
+                                    <input id="fc-fecha" name="fecha" type="datetime-local" class="input" data-validar="fecha-pasada">
+                                    <span class="error" data-error-de="fecha"></span>
+                                </div>
+                                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Guardar lectura</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-cab"><h2>Lecturas del hidrómetro</h2><span class="muted" id="lecturas-cuenta"></span></div>
+                        <div class="tabla-wrap">
+                            <table class="tabla">
+                                <thead><tr><th>Fecha</th><th class="der">Caudal</th><th class="der">Horas</th><th class="der">Volumen</th><th>Origen</th><th>Pago</th><th class="solo-admin"></th></tr></thead>
+                                <tbody id="tbody-caudal"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ GERENCIA ============ -->
+            <section data-vista="gerencia" class="stack hidden">
+                <div class="vista-cabecera">
+                    <div>
+                        <h1>Tablero gerencial</h1>
+                        <p id="ger-sub">Cómo está el equipo, los regantes, el dinero y el agua de la sierra.</p>
+                    </div>
+                    <div class="segmented" role="tablist" aria-label="Secciones del tablero" id="ger-tabs">
+                        <button type="button" data-gtab="resumen" aria-pressed="true"><i class="fa-solid fa-people-group"></i> Equipo y regantes</button>
+                        <button type="button" data-gtab="finanzas" aria-pressed="false"><i class="fa-solid fa-sack-dollar"></i> Costos e ingresos</button>
+                        <button type="button" data-gtab="capacidad" aria-pressed="false"><i class="fa-solid fa-water"></i> Capacidad y cupos</button>
+                    </div>
+                </div>
+
+                <!-- Resumen -->
+                <div class="stack" data-gpanel="resumen">
+                    <div class="panel metricas" id="ger-metricas"></div>
+                    <div class="grid-2">
+                        <div class="panel">
+                            <div class="panel-cab"><h2>Alineación del equipo</h2><span class="muted small" id="ger-alineacion-score"></span></div>
+                            <div class="panel-cuerpo semaforo-lista" id="ger-indicadores"></div>
+                        </div>
+                        <div class="panel">
+                            <div class="panel-cab"><h2>Parceleros y fundos</h2><span class="muted small">Regantes activos</span></div>
+                            <div class="panel-cuerpo" id="ger-regantes"></div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-cab"><h2>Administradores y operadores</h2><span class="muted small">Actividad registrada en la bitácora</span></div>
+                        <div class="tabla-wrap">
+                            <table class="tabla">
+                                <thead><tr><th>Persona</th><th>Último ingreso</th><th class="der">Acciones 7 días</th><th class="der">Lecturas 30 d</th><th class="der">Pagos 30 d</th><th class="der">Turnos 30 d</th><th>Estado</th></tr></thead>
+                                <tbody id="ger-personal"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-cab"><h2>Mayores deudas</h2><span class="muted small" id="ger-deuda-sub"></span></div>
+                        <div class="tabla-wrap">
+                            <table class="tabla">
+                                <thead><tr><th>Regante</th><th>Tipo</th><th class="der">Volumen sin pagar</th><th class="der">Deuda</th><th class="der">Antigüedad</th></tr></thead>
+                                <tbody id="ger-deudores"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Finanzas -->
+                <div class="stack hidden" data-gpanel="finanzas">
+                    <div class="fila-flex">
+                        <div class="segmented" role="group" aria-label="Periodo" id="ger-periodo">
+                            <button type="button" data-meses="6" aria-pressed="false">6 meses</button>
+                            <button type="button" data-meses="12" aria-pressed="true">12 meses</button>
+                            <button type="button" data-meses="24" aria-pressed="false">24 meses</button>
+                        </div>
+                        <span class="espacio"></span>
+                        <span class="muted small">Ingresos = canon cobrado + otros ingresos. Egresos = gastos registrados por la Junta.</span>
+                    </div>
+                    <div class="panel metricas" id="fin-metricas"></div>
+                    <div class="panel metricas" id="fin-metricas-2"></div>
+                    <div class="grid-2">
+                        <div class="panel">
+                            <div class="panel-cab"><h2>Ingresos y egresos por mes</h2><span class="leyenda-mini"><i style="background:var(--agua)"></i>Ingresos <i style="background:var(--n-naranja)"></i>Egresos <i style="background:var(--arena)"></i>Resultado</span></div>
+                            <div class="panel-cuerpo"><div class="grafico"><canvas id="graf-fin-mes"></canvas></div></div>
+                        </div>
+                        <div class="panel">
+                            <div class="panel-cab"><h2>Agua de la sierra: del canal al cobro</h2><span class="leyenda-mini"><i style="background:var(--agua-2)"></i>Captado <i style="background:var(--agua)"></i>Entregado <i style="background:var(--arena)"></i>Cobrado</span></div>
+                            <div class="panel-cuerpo"><div class="grafico"><canvas id="graf-fin-agua"></canvas></div></div>
+                        </div>
+                        <div class="panel">
+                            <div class="panel-cab"><h2>Egresos por categoría</h2></div>
+                            <div class="panel-cuerpo"><div class="grafico"><canvas id="graf-fin-cat"></canvas></div></div>
+                        </div>
+                        <div class="panel">
+                            <div class="panel-cab"><h2>Cobros por medio de pago</h2></div>
+                            <div class="panel-cuerpo"><div class="grafico"><canvas id="graf-fin-medio"></canvas></div></div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-cab"><h2>Registrar egreso u otro ingreso</h2><span class="muted small">Planillas, mantenimiento, energía, retribución a la ANA, multas…</span></div>
+                        <div class="panel-cuerpo grid-side">
+                            <form id="form-mov" class="form-grid" novalidate>
+                                <div class="segmented" role="group" aria-label="Tipo de movimiento" id="fm-tipo">
+                                    <button type="button" data-tipo-mov="egreso" aria-pressed="true">Egreso</button>
+                                    <button type="button" data-tipo-mov="ingreso" aria-pressed="false">Otro ingreso</button>
+                                </div>
+                                <div class="form-grid cols-2" style="gap:12px">
+                                    <div class="field">
+                                        <label for="fm-fecha">Fecha</label>
+                                        <input id="fm-fecha" name="fecha" type="date" class="input" required>
+                                        <span class="error" data-error-de="fecha"></span>
+                                    </div>
+                                    <div class="field">
+                                        <label for="fm-monto">Monto (S/)</label>
+                                        <input id="fm-monto" name="monto" class="input mono" inputmode="decimal" data-validar="monto" placeholder="0.00" required>
+                                        <span class="error" data-error-de="monto"></span>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label for="fm-cat">Categoría</label>
+                                    <select id="fm-cat" name="categoria" class="select"></select>
+                                    <span class="error" data-error-de="categoria"></span>
+                                </div>
+                                <div class="field">
+                                    <label for="fm-desc">Descripción</label>
+                                    <input id="fm-desc" name="descripcion" class="input" maxlength="200" placeholder="Ej. Limpieza del canal sector Los Aquijes" required data-validar="descripcion">
+                                    <span class="error" data-error-de="descripcion"></span>
+                                </div>
+                                <div class="field">
+                                    <label for="fm-doc">N.° de comprobante <span class="muted">(opcional)</span></label>
+                                    <input id="fm-doc" name="documento" class="input mono" maxlength="40" placeholder="Ej. F001-000123">
+                                    <span class="error" data-error-de="documento"></span>
+                                </div>
+                                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Registrar</button>
+                            </form>
+                            <div class="tabla-wrap">
+                                <table class="tabla">
+                                    <thead><tr><th>Fecha</th><th>Detalle</th><th class="der">Monto</th><th></th></tr></thead>
+                                    <tbody id="tbody-mov"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Capacidad -->
+                <div class="stack hidden" data-gpanel="capacidad">
+                    <div class="panel metricas" id="cap-metricas"></div>
+                    <div class="panel">
+                        <div class="panel-cab"><h2>¿Cuánta agua puede mover La Achirana?</h2><span class="muted small" id="cap-nota"></span></div>
+                        <div class="panel-cuerpo stack" style="gap:18px">
+                            <div class="capacidad-barra" id="cap-barra"></div>
+                            <div class="cap-grid" id="cap-detalle"></div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-cab"><h2>Simulador de reparto</h2><span class="muted small">Mueve el caudal y mira cómo se reparte el agua del día. No guarda nada.</span></div>
+                        <div class="panel-cuerpo stack" style="gap:18px">
+                            <div class="sim-controles">
+                                <div class="field" style="flex:1">
+                                    <label for="sim-lps">Caudal en la bocatoma: <strong id="sim-lps-txt">–</strong></label>
+                                    <input id="sim-lps" type="range" min="0" max="3000" step="5" value="300" class="rango">
+                                    <div class="rango-marcas" id="sim-marcas"></div>
+                                </div>
+                                <div class="field" style="width:130px">
+                                    <label for="sim-horas">Horas de entrega</label>
+                                    <select id="sim-horas" class="select"><option>24</option><option>18</option><option>12</option><option>8</option></select>
+                                </div>
+                                <div class="sim-presets" id="sim-presets"></div>
+                            </div>
+                            <div class="metricas sim-metricas" id="sim-metricas"></div>
+                            <div class="sim-barra" id="sim-barra"></div>
+                            <div class="tabla-wrap">
+                                <table class="tabla">
+                                    <thead><tr><th>Regante</th><th class="der">Cupo base</th><th style="min-width:200px">Recibe</th><th class="der">Adicional</th><th class="der">% del canal</th><th>Estado</th></tr></thead>
+                                    <tbody id="sim-tbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-cab"><h2>Cupo y límite de cada regante</h2><span class="muted small" id="cupos-sub"></span></div>
+                        <div class="panel-cuerpo">
+                            <div class="aviso agua" id="cupos-regla"></div>
+                        </div>
+                        <div class="tabla-wrap">
+                            <table class="tabla">
+                                <thead><tr><th>Regante</th><th class="der">Área</th><th class="der">Cupo base/día</th><th class="der">+ Adicional</th><th class="der">Máximo/día</th><th class="der">Límite del canal hoy</th><th style="min-width:170px">Programado hoy</th></tr></thead>
+                                <tbody id="cupos-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ CLIMA ============ -->
+            <section data-vista="clima" class="stack hidden">
+                <div class="vista-cabecera">
+                    <div>
+                        <h1>Lluvias en la sierra</h1>
+                        <p>Pronóstico de lluvia en las cabeceras del río Ica y una estimación de cuándo llegaría esa agua a la bocatoma La Achirana.</p>
+                    </div>
+                    <div class="fila-flex">
+                        <span class="small muted" id="clima-actualizado"></span>
+                        <button type="button" class="btn btn-ghost btn-sm solo-admin" id="btn-clima-refrescar"><i class="fa-solid fa-rotate"></i> Actualizar</button>
+                    </div>
+                </div>
+
+                <div class="panel cuenca-hero">
+                    <div class="cuenca-cab">
+                        <div>
+                            <h2 id="cuenca-titulo">Perfil del río Ica</h2>
+                            <p id="cuenca-texto">Cargando pronóstico…</p>
+                        </div>
+                        <span class="chip" id="cuenca-temporada"></span>
+                    </div>
+                    <div class="dias-chips" id="dias-chips" role="group" aria-label="Día del pronóstico"></div>
+                    <div id="perfil-contenedor"><div class="cargando"><i class="fa-solid fa-spinner spin"></i> Cargando…</div></div>
+                    <div class="cuenca-leyenda" id="cuenca-leyenda"></div>
+                    <div class="llegada" id="llegada"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-cab">
+                        <h2>Mapa de lluvias</h2>
+                        <div class="segmented mapa-tabs" role="tablist">
+                            <button type="button" data-mapa="nasa" aria-pressed="true">Satélite NASA</button>
+                            <button type="button" data-mapa="windy" aria-pressed="false">Pronóstico animado</button>
+                        </div>
+                    </div>
+                    <div class="mapa" id="mapa-nasa">
+                        <div id="mapa-leaflet" style="height:100%"></div>
+                        <div class="mapa-controles">
+                            <label class="check"><input type="checkbox" id="capa-imerg" checked> Lluvia satelital (IMERG)</label>
+                            <label class="check"><input type="checkbox" id="capa-nubes"> Nubes, imagen real (MODIS)</label>
+                            <div class="field">
+                                <label class="label" for="capa-fecha">Fecha de la imagen</label>
+                                <input type="date" id="capa-fecha" class="input" style="padding:6px 8px;font-size:13px">
+                            </div>
+                            <span class="small muted" id="capa-estado">Fuente: NASA GIBS / Worldview</span>
+                        </div>
+                    </div>
+                    <div class="mapa hidden" id="mapa-windy"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-cab"><h2>Pronóstico por punto (mm de lluvia al día)</h2><span class="muted">Probabilidad debajo del valor</span></div>
+                    <div class="panel-cuerpo tabla-wrap"><table class="matriz" id="matriz"></table></div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="panel">
+                        <div class="panel-cab"><h2>Caudal modelado del río Ica</h2><span class="muted">m³/s · GloFAS</span></div>
+                        <div class="panel-cuerpo">
+                            <div class="grafico bajo"><canvas id="graf-rio"></canvas></div>
+                            <p class="small muted" id="rio-nota" style="margin-top:10px"></p>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-cab"><h2>Cómo se calcula la llegada</h2></div>
+                        <div class="panel-cuerpo metodo" id="metodo"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ PAGOS ============ -->
+            <!-- ============ TURNOS DE RIEGO ============ -->
+            <section data-vista="turnos" class="stack hidden">
+                <div class="vista-cabecera">
+                    <div>
+                        <h1>Turnos de riego</h1>
+                        <p id="turnos-sub">El caudal del canal se reparte durante las 24 horas según la demanda de cada cultivo. Si sobra agua, va a los fundos que almacenan.</p>
+                    </div>
+                    <div class="fila-flex">
+                        <div class="segmented" role="group" aria-label="Día" id="turnos-dia">
+                            <button type="button" data-dia="hoy" aria-pressed="true">Hoy</button>
+                            <button type="button" data-dia="manana" aria-pressed="false">Mañana</button>
+                        </div>
+                        <button type="button" class="btn btn-primary solo-personal" id="btn-generar-turnos"><i class="fa-solid fa-wand-magic-sparkles"></i> Generar turnos</button>
+                    </div>
+                </div>
+
+                <div class="grid-side solo-personal">
+                    <form class="panel" id="form-canal" novalidate>
+                        <div class="panel-cab"><h2>Caudal del canal</h2><span class="muted" id="canal-vigente">–</span></div>
+                        <div class="panel-cuerpo form-grid">
+                            <div class="field">
+                                <label for="fcn-lps">Caudal actual (L/s)</label>
+                                <input id="fcn-lps" name="lps" class="input mono" inputmode="decimal" data-validar="lps-canal" placeholder="Ej. 350" required>
+                                <span class="hint" id="fcn-conv">Se convierte a m³/hora y m³/día automáticamente.</span>
+                                <span class="error" data-error-de="lps"></span>
+                            </div>
+                            <div class="field">
+                                <label for="fcn-nota">Nota <span class="muted">(opcional)</span></label>
+                                <input id="fcn-nota" name="nota" class="input" maxlength="200" placeholder="Ej. Aforo en bocatoma, subió por lluvias">
+                                <span class="error" data-error-de="nota"></span>
+                            </div>
+                            <label class="check"><input type="checkbox" name="recalcular" checked> Recalcular los turnos pendientes desde ahora</label>
+                            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-gauge-high"></i> Registrar caudal</button>
+                        </div>
+                    </form>
+                    <div class="panel">
+                        <div class="panel-cab"><h2>Lecturas del canal de hoy</h2><span class="muted small">Cada cambio reprograma lo que falta del día</span></div>
+                        <div class="tabla-wrap">
+                            <table class="tabla">
+                                <thead><tr><th>Hora</th><th class="der">L/s</th><th class="der">m³/hora</th><th class="der">m³/día</th><th>Nota</th><th>Registró</th></tr></thead>
+                                <tbody id="tbody-canal"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel metricas" id="metricas-turnos"></div>
+
+                <div class="panel">
+                    <div class="panel-cab"><h2 id="linea-titulo">Horario del día</h2>
+                        <div class="cuenca-leyenda" style="padding:0">
+                            <span><i class="cuadro" style="background:var(--agua)"></i> Riego</span>
+                            <span><i class="cuadro" style="background:var(--arena)"></i> Almacenamiento</span>
+                            <span><i class="cuadro" style="background:var(--surface-3)"></i> Cumplido</span>
+                        </div>
+                    </div>
+                    <div class="panel-cuerpo"><div class="linea-tiempo" id="linea-tiempo"></div></div>
+                    <div class="tabla-wrap">
+                        <table class="tabla">
+                            <thead><tr><th>N.°</th><th>Regante</th><th>Tipo</th><th>Horario</th><th class="der">Duración</th><th class="der">Volumen</th><th>Estado</th><th class="solo-personal"></th></tr></thead>
+                            <tbody id="tbody-turnos"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section data-vista="pagos" class="stack hidden">
+                <div class="vista-cabecera">
+                    <div>
+                        <h1>Pagos y comprobantes</h1>
+                        <p id="pagos-sub">Historial de pagos. Descarga la boleta o factura de cada pago aprobado.</p>
+                    </div>
+                    <div class="segmented" role="group" aria-label="Periodo" id="filtro-pagos">
+                        <button type="button" data-filtro="dia" aria-pressed="false">Hoy</button>
+                        <button type="button" data-filtro="semana" aria-pressed="false">7 días</button>
+                        <button type="button" data-filtro="mes" aria-pressed="false">30 días</button>
+                        <button type="button" data-filtro="todos" aria-pressed="true">Todo</button>
+                    </div>
+                </div>
+                <div class="panel metricas" id="metricas-pagos"></div>
+                <div class="panel">
+                    <div class="panel-cab">
+                        <h2>Movimientos</h2>
+                        <label class="check solo-staff"><input type="checkbox" id="pagos-todos"> Ver todos los clientes</label>
+                    </div>
+                    <div class="tabla-wrap">
+                        <table class="tabla">
+                            <thead><tr><th>Fecha</th><th class="col-cliente hidden">Cliente</th><th>Comprobante</th><th>Concepto</th><th>Medio</th><th>Estado</th><th class="der">Monto</th><th></th></tr></thead>
+                            <tbody id="tbody-pagos"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ ANÁLISIS ============ -->
+            <section data-vista="analisis" class="stack hidden">
+                <div class="vista-cabecera">
+                    <div>
+                        <h1>Análisis de caudal</h1>
+                        <p>Cómo varió el caudal entregado (L/s) y el volumen diario (m³).</p>
+                    </div>
+                    <form class="fila-flex" id="form-rango" novalidate>
+                        <div class="field"><label for="g-desde" class="label">Desde</label><input type="date" id="g-desde" class="input" style="padding:8px 10px"></div>
+                        <div class="field"><label for="g-hasta" class="label">Hasta</label><input type="date" id="g-hasta" class="input" style="padding:8px 10px"></div>
+                        <button type="submit" class="btn btn-primary" style="align-self:end"><i class="fa-solid fa-filter"></i> Aplicar</button>
+                    </form>
+                </div>
+                <div class="panel">
+                    <div class="panel-cab"><h2>Caudal entregado</h2><span class="muted" id="g-resumen"></span></div>
+                    <div class="panel-cuerpo"><div class="grafico"><canvas id="graf-lps"></canvas></div></div>
+                </div>
+                <div class="panel">
+                    <div class="panel-cab"><h2>Volumen por lectura</h2><span class="muted">m³/día</span></div>
+                    <div class="panel-cuerpo"><div class="grafico bajo"><canvas id="graf-m3"></canvas></div></div>
+                </div>
+            </section>
+
+            <!-- ============ ADMIN ============ -->
+            <section data-vista="admin" class="stack hidden">
+                <div class="vista-cabecera">
+                    <div>
+                        <h1>Panel de control</h1>
+                        <p>Regantes, personal, tarifa, cupos de riego, medios de pago, validación de pagos y puntos de monitoreo.</p>
+                    </div>
+                </div>
+                <div class="panel metricas" id="metricas-admin"></div>
+                <div class="panel">
+                    <div class="tabs" role="tablist" id="admin-tabs">
+                        <button type="button" role="tab" data-tab="clientes" aria-selected="true">Regantes</button>
+                        <button type="button" role="tab" data-tab="usuarios" aria-selected="false">Personal</button>
+                        <button type="button" role="tab" data-tab="tarifa" aria-selected="false">Tarifa</button>
+                        <button type="button" role="tab" data-tab="riego" aria-selected="false">Cupos y riego</button>
+                        <button type="button" role="tab" data-tab="validar" aria-selected="false">Pagos por validar <span class="badge-num hidden" id="badge-validar">0</span></button>
+                        <button type="button" role="tab" data-tab="medios" aria-selected="false">Medios de pago</button>
+                        <button type="button" role="tab" data-tab="puntos" aria-selected="false">Puntos de monitoreo</button>
+                        <button type="button" role="tab" data-tab="auditoria" aria-selected="false">Bitácora</button>
+                    </div>
+
+                    <!-- Regantes -->
+                    <div class="panel-cuerpo grid-side" data-tabpanel="clientes">
+                        <form id="form-cliente" class="form-grid" novalidate>
+                            <h3 id="fcl-titulo" style="font-size:16px">Nuevo regante</h3>
+                            <input type="hidden" name="rid">
+                            <div class="field">
+                                <label for="fcl-tipo">Tipo</label>
+                                <select id="fcl-tipo" name="tipo" class="select">
+                                    <option value="empresa">Fundo o empresa (RUC)</option>
+                                    <option value="parcelero">Parcelero (DNI)</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="fcl-doc">RUC</label>
+                                <input id="fcl-doc" name="documento" class="input mono" inputmode="numeric" data-validar="ruc" maxlength="11" placeholder="11 dígitos" required>
+                                <span class="error" data-error-de="documento"></span>
+                            </div>
+                            <div class="field">
+                                <label for="fcl-nombre">Razón social o nombre completo</label>
+                                <input id="fcl-nombre" name="nombre" class="input" data-validar="nombre" maxlength="100" placeholder="Ej. Agrícola San Juan S.A.C." required>
+                                <span class="error" data-error-de="nombre"></span>
+                            </div>
+                            <div class="form-grid cols-2">
+                                <div class="field">
+                                    <label for="fcl-ha">Hectáreas</label>
+                                    <input id="fcl-ha" name="hectareas" class="input mono" inputmode="decimal" data-validar="hectareas" placeholder="45.50" required>
+                                    <span class="error" data-error-de="hectareas"></span>
+                                </div>
+                                <div class="field">
+                                    <label for="fcl-cultivo">Cultivo</label>
+                                    <input id="fcl-cultivo" name="cultivo" class="input" data-validar="cultivo" maxlength="100" placeholder="Ej. Vid" required>
+                                    <span class="error" data-error-de="cultivo"></span>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label for="fcl-sector">Ubicación o sector</label>
+                                <input id="fcl-sector" name="ubicacion_sector" class="input" data-validar="sector" maxlength="150" placeholder="Ej. Los Aquijes, Tallamana" required>
+                                <span class="error" data-error-de="ubicacion_sector"></span>
+                            </div>
+                            <div class="field">
+                                <label for="fcl-pin">Código de acceso (6 dígitos)</label>
+                                <input id="fcl-pin" name="pin" class="input mono" inputmode="numeric" data-validar="pin-opcional" maxlength="6" autocomplete="off" placeholder="Déjalo vacío para no cambiarlo">
+                                <span class="hint">El regante lo usará junto a su documento para ingresar.</span>
+                                <span class="error" data-error-de="pin"></span>
+                            </div>
+                            <div class="field" id="fcl-alm-wrap">
+                                <label class="check"><input type="checkbox" name="almacena" id="fcl-almacena"> Almacena agua en reservorio</label>
+                                <span class="hint">Si sobra agua, recibirá hasta una semana de riego según sus hectáreas.</span>
+                            </div>
+                            <div class="field hidden" id="fcl-cap-wrap">
+                                <label for="fcl-cap">Capacidad del reservorio (m³) <span class="muted">(opcional)</span></label>
+                                <input id="fcl-cap" name="capacidad_reservorio_m3" class="input mono" inputmode="decimal" data-validar="capacidad" placeholder="Ej. 25000">
+                                <span class="error" data-error-de="capacidad_reservorio_m3"></span>
+                            </div>
+                            <label class="check hidden" id="fcl-quitar-pin-wrap"><input type="checkbox" name="quitar_pin"> Quitar el código actual</label>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> <span>Guardar regante</span></button>
+                                <button type="reset" class="btn btn-ghost">Cancelar</button>
+                            </div>
+                        </form>
+                        <div class="tabla-wrap">
+                            <div class="fila-flex" style="margin-bottom:10px">
+                                <input type="search" id="buscar-cliente" class="input" placeholder="Buscar por nombre o documento" style="max-width:320px">
+                            </div>
+                            <table class="tabla">
+                                <thead><tr><th>Documento</th><th>Nombre</th><th class="der">Área</th><th>Código</th><th>Estado</th><th></th></tr></thead>
+                                <tbody id="tbody-clientes"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Personal -->
+                    <div class="panel-cuerpo grid-side hidden" data-tabpanel="usuarios">
+                        <form id="form-usuario" class="form-grid" novalidate>
+                            <h3 id="fu-titulo" style="font-size:16px">Nuevo miembro del personal</h3>
+                            <input type="hidden" name="rid">
+                            <div class="field">
+                                <label for="fu-nombre">Nombre</label>
+                                <input id="fu-nombre" name="nombre" class="input" data-validar="nombre-persona" maxlength="100" required>
+                                <span class="error" data-error-de="nombre"></span>
+                            </div>
+                            <div class="field">
+                                <label for="fu-email">Correo</label>
+                                <input id="fu-email" name="email" type="email" class="input" data-validar="email" maxlength="100" autocomplete="off" required>
+                                <span class="error" data-error-de="email"></span>
+                            </div>
+                            <div class="field">
+                                <label for="fu-rol">Rol</label>
+                                <select id="fu-rol" name="rol" class="select">
+                                    <option value="admin">Administrador (acceso total)</option>
+                                    <option value="operador">Operador (registra lecturas y turnos)</option>
+                                    <option value="gerente">Gerente (tablero gerencial, solo lectura)</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="fu-pass">Contraseña</label>
+                                <div class="input-wrap">
+                                    <input id="fu-pass" name="pass" type="password" class="input" data-validar="clave" maxlength="72" autocomplete="new-password">
+                                    <button type="button" class="icon-btn" data-ver-clave="fu-pass" aria-label="Mostrar contraseña"><i class="fa-regular fa-eye"></i></button>
+                                </div>
+                                <span class="hint" id="fu-pass-hint">Mínimo 8 caracteres con mayúscula, minúscula, número y símbolo.</span>
+                                <span class="error" data-error-de="pass"></span>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+                                <button type="reset" class="btn btn-ghost">Cancelar</button>
+                            </div>
+                        </form>
+                        <div class="tabla-wrap">
+                            <table class="tabla">
+                                <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Último acceso</th><th></th></tr></thead>
+                                <tbody id="tbody-usuarios"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tarifa -->
+                    <div class="panel-cuerpo grid-side hidden" data-tabpanel="tarifa">
+                        <form id="form-tarifa" class="form-grid" novalidate>
+                            <h3 style="font-size:16px">Cambiar tarifa por m³</h3>
+                            <p class="small muted">Se aplica a los pagos que se generen desde ahora. Los comprobantes ya emitidos no cambian.</p>
+                            <div class="field">
+                                <label for="ft-precio">Precio por m³ (S/)</label>
+                                <input id="ft-precio" name="precio_m3" class="input mono" inputmode="decimal" data-validar="tarifa" placeholder="0.1200" required>
+                                <span class="error" data-error-de="precio_m3"></span>
+                            </div>
+                            <div class="field">
+                                <label for="ft-motivo">Motivo del cambio</label>
+                                <input id="ft-motivo" name="motivo" class="input" data-validar="motivo" maxlength="200" placeholder="Ej. Acuerdo de asamblea del 15/10/2026" required>
+                                <span class="error" data-error-de="motivo"></span>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Aplicar nueva tarifa</button>
+                        </form>
+                        <div class="tabla-wrap">
+                            <table class="tabla">
+                                <thead><tr><th>Desde</th><th class="der">S/ por m³</th><th>Motivo</th><th>Registrado por</th></tr></thead>
+                                <tbody id="tbody-tarifas"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Riego -->
+                    <div class="panel-cuerpo grid-side hidden" data-tabpanel="riego">
+                        <form id="form-riego" class="form-grid" novalidate>
+                            <h3 style="font-size:16px">Cupo por hectárea</h3>
+                            <div class="field">
+                                <label for="fr-dotacion">Dotación (m³ por hectárea al día)</label>
+                                <input id="fr-dotacion" name="dotacion_m3_ha" class="input mono" inputmode="decimal" data-validar="dotacion" required>
+                                <span class="hint" id="fr-dotacion-hint">Cupo base = hectáreas × dotación × factor del cultivo.</span>
+                                <span class="error" data-error-de="dotacion_m3_ha"></span>
+                            </div>
+                            <div class="form-grid cols-2" style="gap:12px">
+                                <div class="field">
+                                    <label for="fr-adp">Adicional parcelero (%)</label>
+                                    <input id="fr-adp" name="adicional_pct_parcelero" class="input mono" inputmode="decimal" data-validar="porcentaje0" required>
+                                    <span class="error" data-error-de="adicional_pct_parcelero"></span>
+                                </div>
+                                <div class="field">
+                                    <label for="fr-adf">Adicional fundo (%)</label>
+                                    <input id="fr-adf" name="adicional_pct_fundo" class="input mono" inputmode="decimal" data-validar="porcentaje0" required>
+                                    <span class="error" data-error-de="adicional_pct_fundo"></span>
+                                </div>
+                                <div class="field">
+                                    <label for="fr-tpp">Límite parcelero (% del canal)</label>
+                                    <input id="fr-tpp" name="tope_pct_parcelero" class="input mono" inputmode="decimal" data-validar="porcentaje" required>
+                                    <span class="error" data-error-de="tope_pct_parcelero"></span>
+                                </div>
+                                <div class="field">
+                                    <label for="fr-tpf">Límite fundo (% del canal)</label>
+                                    <input id="fr-tpf" name="tope_pct_fundo" class="input mono" inputmode="decimal" data-validar="porcentaje" required>
+                                    <span class="error" data-error-de="tope_pct_fundo"></span>
+                                </div>
+                            </div>
+                            <span class="hint">Adicional: agua extra que el regante puede comprar o almacenar si sobra. Límite: lo máximo que un solo regante puede llevarse del agua del día mientras otros aún no completan su cupo.</span>
+                            <div class="field">
+                                <label for="fr-prio">Orden de atención del adicional</label>
+                                <select id="fr-prio" name="prioridad_adicional" class="select">
+                                    <option value="parcelero">Primero parceleros, luego fundos</option>
+                                    <option value="fundo">Primero fundos, luego parceleros</option>
+                                    <option value="igual">Todos a la vez (proporcional)</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="fr-dias">Ventana de almacenamiento (días)</label>
+                                <input id="fr-dias" name="dias_almacenamiento" class="input mono" inputmode="numeric" data-validar="dias" required>
+                                <span class="hint">Un fundo no recibe para almacenar más que la capacidad de su reservorio en estos días.</span>
+                                <span class="error" data-error-de="dias_almacenamiento"></span>
+                            </div>
+                            <h3 style="font-size:16px;margin-top:6px">Capacidad del sistema</h3>
+                            <div class="form-grid cols-2" style="gap:12px">
+                                <div class="field">
+                                    <label for="fr-cap">Capacidad del canal (L/s)</label>
+                                    <input id="fr-cap" name="canal_capacidad_lps" class="input mono" inputmode="decimal" data-validar="capacidad-canal" required>
+                                    <span class="error" data-error-de="canal_capacidad_lps"></span>
+                                </div>
+                                <div class="field">
+                                    <label for="fr-resj">Reservorios de la Junta (m³)</label>
+                                    <input id="fr-resj" name="reservorio_junta_m3" class="input mono" inputmode="decimal" data-validar="volumen0" required>
+                                    <span class="error" data-error-de="reservorio_junta_m3"></span>
+                                </div>
+                            </div>
+                            <span class="hint">Usa el caudal de diseño de la bocatoma y el canal. Se usa en el modelo de capacidad del tablero gerencial.</span>
+                            <div class="field">
+                                <span class="label">Factor de demanda por cultivo</span>
+                                <span class="hint">1.00 = usa la dotación general. Ej. 1.20 si el cultivo necesita 20 % más.</span>
+                                <div id="fr-factores" class="form-grid cols-2" style="gap:10px"></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Guardar parámetros</button>
+                        </form>
+                        <div class="tabla-wrap">
+                            <h3 style="font-size:15px;margin-bottom:8px">Cupo y límite de cada regante</h3>
+                            <table class="tabla">
+                                <thead><tr><th>Regante</th><th class="der">Área</th><th class="der">Factor</th><th class="der">Cupo base/día</th><th class="der">Adicional</th><th class="der">Máximo/día</th><th class="der">Límite del canal</th></tr></thead>
+                                <tbody id="tbody-demandas"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Pagos por validar -->
+                    <div class="panel-cuerpo hidden" data-tabpanel="validar">
+                        <div class="fila-flex" style="margin-bottom:14px">
+                            <p class="small muted" style="margin:0">Compara cada voucher con tu app de Yape/Plin o el estado de cuenta del banco antes de aprobar. Al aprobar se emite la boleta o factura.</p>
+                            <span class="espacio"></span>
+                            <button type="button" class="btn btn-ghost btn-sm" id="btn-recargar-validar"><i class="fa-solid fa-rotate"></i> Actualizar</button>
+                        </div>
+                        <div class="validar-lista" id="validar-lista"></div>
+                    </div>
+
+                    <!-- Medios de pago -->
+                    <div class="panel-cuerpo grid-side hidden" data-tabpanel="medios">
+                        <form id="form-cuenta" class="form-grid" novalidate>
+                            <h3 id="fcu-titulo" style="font-size:16px">Nuevo medio de pago</h3>
+                            <input type="hidden" name="rid">
+                            <div class="field">
+                                <span class="label">Tipo</span>
+                                <div class="segmented" role="group" aria-label="Tipo de medio" id="fcu-metodo">
+                                    <button type="button" data-metodo="yape" aria-pressed="true">Yape</button>
+                                    <button type="button" data-metodo="plin" aria-pressed="false">Plin</button>
+                                    <button type="button" data-metodo="transferencia" aria-pressed="false">Banco</button>
+                                </div>
+                            </div>
+                            <div class="field" id="fcu-entidad-wrap">
+                                <label for="fcu-entidad">Banco</label>
+                                <select id="fcu-entidad" name="entidad" class="select"></select>
+                                <span class="error" data-error-de="entidad"></span>
+                            </div>
+                            <div class="field">
+                                <label for="fcu-titular">Titular</label>
+                                <input id="fcu-titular" name="titular" class="input" maxlength="100" placeholder="Junta de Usuarios La Achirana" required data-validar="nombre">
+                                <span class="error" data-error-de="titular"></span>
+                            </div>
+                            <div class="field">
+                                <label for="fcu-numero" id="fcu-numero-lbl">Celular de Yape</label>
+                                <input id="fcu-numero" name="numero" class="input mono" inputmode="numeric" maxlength="24" placeholder="9XX XXX XXX" required>
+                                <span class="error" data-error-de="numero"></span>
+                            </div>
+                            <div class="field hidden" id="fcu-cci-wrap">
+                                <label for="fcu-cci">CCI <span class="muted">(20 dígitos, para otros bancos)</span></label>
+                                <input id="fcu-cci" name="cci" class="input mono" inputmode="numeric" maxlength="24" placeholder="002 191 ...">
+                                <span class="error" data-error-de="cci"></span>
+                            </div>
+                            <div class="field" id="fcu-qr-wrap">
+                                <label for="fcu-qr">Código QR <span class="muted">(captura del QR de tu app)</span></label>
+                                <input id="fcu-qr" type="file" accept="image/png,image/jpeg,image/webp" class="input">
+                                <span class="hint">En Yape: menú → “Mi QR” → descargar. Se muestra al regante para que lo escanee.</span>
+                                <div id="fcu-qr-prev" class="qr-prev hidden"></div>
+                                <label class="check hidden" id="fcu-quitar-qr-wrap"><input type="checkbox" name="quitar_qr"> Quitar el QR actual</label>
+                                <span class="error" data-error-de="qr"></span>
+                            </div>
+                            <div class="field">
+                                <label for="fcu-instr">Indicación para el regante <span class="muted">(opcional)</span></label>
+                                <input id="fcu-instr" name="instrucciones" class="input" maxlength="200" placeholder="Ej. Escribe tu DNI o RUC en el mensaje">
+                                <span class="error" data-error-de="instrucciones"></span>
+                            </div>
+                            <label class="check"><input type="checkbox" name="activo" checked> Disponible para los regantes</label>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> <span>Guardar</span></button>
+                                <button type="reset" class="btn btn-ghost">Limpiar</button>
+                            </div>
+                        </form>
+                        <div class="stack" style="gap:12px">
+                            <h3 style="font-size:16px;margin:0">Así lo verá el regante</h3>
+                            <div class="cuentas-grid" id="cuentas-lista"></div>
+                        </div>
+                    </div>
+
+                    <!-- Puntos -->
+                    <div class="panel-cuerpo grid-side hidden" data-tabpanel="puntos">
+                        <form id="form-punto" class="form-grid" novalidate>
+                            <h3 id="fp-titulo" style="font-size:16px">Nuevo punto de monitoreo</h3>
+                            <input type="hidden" name="rid">
+                            <div class="field"><label for="fp-nombre">Nombre</label><input id="fp-nombre" name="nombre" class="input" data-validar="nombre" maxlength="100" required><span class="error" data-error-de="nombre"></span></div>
+                            <div class="field">
+                                <label for="fp-tipo">Tipo</label>
+                                <select id="fp-tipo" name="tipo" class="select">
+                                    <option value="sierra">Sierra (cabecera de cuenca)</option>
+                                    <option value="bocatoma">Bocatoma (punto de llegada)</option>
+                                    <option value="valle">Valle (aguas abajo)</option>
+                                </select>
+                            </div>
+                            <div class="form-grid cols-2">
+                                <div class="field"><label for="fp-lat">Latitud</label><input id="fp-lat" name="latitud" class="input mono" inputmode="decimal" data-validar="latitud" placeholder="-13.82533" required><span class="error" data-error-de="latitud"></span></div>
+                                <div class="field"><label for="fp-lon">Longitud</label><input id="fp-lon" name="longitud" class="input mono" inputmode="decimal" data-validar="longitud" placeholder="-75.25773" required><span class="error" data-error-de="longitud"></span></div>
+                                <div class="field"><label for="fp-alt">Altitud (m)</label><input id="fp-alt" name="altitud_m" class="input mono" inputmode="numeric" data-validar="altitud" required><span class="error" data-error-de="altitud_m"></span></div>
+                                <div class="field"><label for="fp-dist">Distancia por el río (km)</label><input id="fp-dist" name="distancia_rio_km" class="input mono" inputmode="decimal" data-validar="distancia" required><span class="error" data-error-de="distancia_rio_km"></span></div>
+                            </div>
+                            <span class="hint">Distancia por el cauce hasta la bocatoma. Para el valle, distancia aguas abajo de la bocatoma.</span>
+                            <label class="check"><input type="checkbox" name="regulado"> Laguna o represa regulada (no genera avenida directa)</label>
+                            <label class="check"><input type="checkbox" name="activo" checked> Activo</label>
+                            <div class="field"><label for="fp-notas">Notas</label><input id="fp-notas" name="notas" class="input" maxlength="250"><span class="error" data-error-de="notas"></span></div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">Guardar punto</button>
+                                <button type="reset" class="btn btn-ghost">Cancelar</button>
+                            </div>
+                        </form>
+                        <div class="tabla-wrap">
+                            <table class="tabla">
+                                <thead><tr><th>Punto</th><th>Tipo</th><th class="der">Altitud</th><th class="der">Distancia</th><th>Estado</th><th></th></tr></thead>
+                                <tbody id="tbody-puntos"></tbody>
+                            </table>
+                            <h3 style="font-size:15px;margin:26px 0 8px">Alertas registradas (últimos 90 días)</h3>
+                            <table class="tabla">
+                                <thead><tr><th>Fecha</th><th>Punto</th><th class="der">Lluvia</th><th>Nivel</th><th>Llegada estimada</th></tr></thead>
+                                <tbody id="tbody-alertas"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Bitácora -->
+                    <div class="panel-cuerpo hidden" data-tabpanel="auditoria">
+                        <div class="tabla-wrap">
+                            <table class="tabla">
+                                <thead><tr><th>Fecha</th><th>Quién</th><th>Acción</th><th>Registro</th><th>IP</th></tr></thead>
+                                <tbody id="tbody-auditoria"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<div id="modales"></div>
+
+<!-- Librerías (versiones fijas) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Aplicación -->
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

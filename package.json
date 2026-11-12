@@ -1,4 +1,18 @@
 {
+  "name": "achirana-gestion-hidrica",
+  "version": "3.1.0",
+  "description": "Junta de Usuarios La Achirana - gestión hídrica, cobro de canon y alertas de lluvia en la sierra",
+  "main": "Backend/app.js",
+  "private": true,
+  "scripts": {
+    "start": "node Backend/app.js",
+    "dev": "node --watch Backend/app.js",
+    "secret": "node -e \"console.log(require('crypto').randomBytes(48).toString('base64url'))\"",
+    "reset-clave": "node Backend/scripts/restablecer-clave.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
