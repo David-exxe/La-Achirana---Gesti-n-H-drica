@@ -180,7 +180,8 @@ Los turnos adicionales aparecen como *Adicional*, o como *Almacenamiento* si el 
 - **Caudal modelado del río Ica:** GloFAS (Copernicus), también vía Open-Meteo.
 - **Alerta para regantes y personal:** una franja visible en todas las pantallas, más un aviso al ingresar.
 - **Simulación de llegada:** el rango entre el tiempo de concentración de Kirpich y la distancia dividida entre la velocidad de avenida (1.5–3.5 m/s). Se aplica desde la hora central de la lluvia del día.
-- **Mapa · Cuenca:** puntos de monitoreo sobre mapa o **satélite** (Esri).
+- **Mapa · Cuenca:** puntos de monitoreo sobre mapa (Esri, sin llave; si falla pasa a OpenStreetMap) o **satélite** (Esri).
+- **Pronóstico sin bloqueos:** el último pronóstico se guarda en la BD (tabla `cache_externo`) y no se vuelve a pedir hasta que venza (1 h; la malla, 2 h). Si Open-Meteo responde 429 a la IP compartida de Render, el servidor espera 20 min y el **navegador consulta directo** con su propia conexión; solo lo que trae el personal de la Junta se guarda para todos.
 - **Mapa · Satélite NASA:** lluvia medida por satélite cada 30 min (GPM IMERG, capa `IMERG_Precipitation_Rate_30min`, llega con ~7 h de retraso) animada en las últimas 24 h, más la foto de nubes del día anterior (MODIS Terra, Aqua o VIIRS).
 - **Mapa · Windy:** pronóstico animado de lluvia (modelo ECMWF). Se carga solo al abrir la pestaña.
 - **Mapa · Lluvia en movimiento:** malla de 72 puntos sobre la cuenca con lluvia **hora por hora** (Open-Meteo, ayer + 2 días). Botón ▶ para animarla, barra de tiempo, velocidad 1×/2×/4×, pico en mm/h y gráfico sierra vs. valle. Ruta: `GET /api/clima/lluvia`.

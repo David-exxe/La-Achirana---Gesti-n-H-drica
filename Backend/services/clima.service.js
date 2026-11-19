@@ -70,7 +70,8 @@ async function obtenerJson(url) {
     }
 }
 
-async function consultarServicios(puntos) {
+/** URLs de Open-Meteo para los puntos activos (también las usa el navegador como respaldo). */
+function urlsServicios(puntos) {
     const lat = puntos.map(p => p.latitud).join(',');
     const lon = puntos.map(p => p.longitud).join(',');
     const urlPronostico = 'https://api.open-meteo.com/v1/forecast'
@@ -83,6 +84,11 @@ async function consultarServicios(puntos) {
         + `?latitude=${bocatoma.latitud}&longitude=${bocatoma.longitud}`
         + '&daily=river_discharge,river_discharge_mean,river_discharge_max&past_days=30&forecast_days=30';
 
+    return { pronostico: urlPronostico, caudal: urlCaudal };
+}
+
+async function consultarServicios(puntos) {
+    const { pronostico: urlPronostico, caudal: urlCaudal } = urlsServicios(puntos);
     const [pron, caudal] = await Promise.allSettled([obtenerJson(urlPronostico), obtenerJson(urlCaudal)]);
     if (pron.status === 'rejected') throw new Error(`Open-Meteo no respondió: ${pron.reason.message}`);
     const lista = Array.isArray(pron.value) ? pron.value : [pron.value];
@@ -333,6 +339,71 @@ async function obtenerResumen({ forzar = false } = {}) {
 
 function invalidar() { cache.expira = 0; }
 
+// ------------------------------------------------------------------ respaldo desde el navegador
+// Si Open-Meteo bloquea la IP compartida de Render (HTTP 429), el navegador
+// consulta directamente y envía los datos aquí para procesarlos.
+async function puntosActivos() {
+    const { rows } = await query('SELECT * FROM puntos_monitoreo WHERE activo ORDER BY altitud_m DESC');
+    if (!rows.length) throw new Error('No hay puntos de monitoreo activos.');
+    return rows;
+}
+
+async function fuentes() {
+    return urlsServicios(await puntosActivos());
+}
+
+const numOk = (v, max) => v === null || (typeof v === 'number' && Number.isFinite(v) && v >= -1 && v <= max);
+function serieOk(arr, largo, max) {
+    return Array.isArray(arr) && arr.length === largo && arr.every(v => numOk(v, max));
+}
+function fechasOk(arr, maxLargo) {
+    return Array.isArray(arr) && arr.length > 0 && arr.length <= maxLargo && arr.every(t => typeof t === 'string' && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/.test(t));
+}
+
+/** Valida la forma de los datos que envía el navegador (solo lo que usa el sistema). */
+function limpiarExterno(cuerpo, n) {
+    const lista = cuerpo?.pronosticos;
+    if (!Array.isArray(lista) || lista.length !== n) throw new Error('Datos de pronóstico incompletos.');
+    const pronosticos = lista.map(p => {
+        const d = p?.daily, h = p?.hourly;
+        if (!d || !fechasOk(d.time, 20)) throw new Error('Pronóstico diario no válido.');
+        const L = d.time.length;
+        const daily = { time: d.time };
+        for (const [k, max] of [['precipitation_sum', 600], ['precipitation_probability_max', 100], ['precipitation_hours', 24], ['temperature_2m_max', 60], ['temperature_2m_min', 60]]) {
+            if (!serieOk(d[k], L, max) && !(k.startsWith('temperature') && serieOk(d[k]?.map(v => (v == null ? null : Math.abs(v))), L, 60))) throw new Error(`Serie ${k} no válida.`);
+            daily[k] = d[k];
+        }
+        if (!h || !fechasOk(h.time, 480) || !serieOk(h.precipitation, h.time.length, 300)) throw new Error('Pronóstico horario no válido.');
+        return { daily, hourly: { time: h.time, precipitation: h.precipitation } };
+    });
+    let caudal = null;
+    const c = cuerpo?.caudal?.daily;
+    if (c && fechasOk(c.time, 120)) {
+        const L = c.time.length;
+        if (['river_discharge', 'river_discharge_mean', 'river_discharge_max'].every(k => serieOk(c[k], L, 100000))) {
+            caudal = { daily: { time: c.time, river_discharge: c.river_discharge, river_discharge_mean: c.river_discharge_mean, river_discharge_max: c.river_discharge_max } };
+        }
+    }
+    return { pronosticos, caudal, errorCaudal: caudal ? null : 'Caudal no disponible' };
+}
+
+/**
+ * Procesa datos traídos por el navegador. Solo si los trae el personal de la
+ * Junta (confiable) se guardan para todos; si no, solo se devuelven.
+ */
+async function procesarExterno(cuerpo, { confiable = false } = {}) {
+    const puntos = await puntosActivos();
+    const datos = limpiarExterno(cuerpo, puntos.length);
+    const resumen = construirResumen(puntos, datos);
+    resumen.fuente_navegador = true;
+    if (confiable) {
+        await cacheExt.guardar(CLAVE, datos);
+        await guardarAlertas(resumen).catch(e => console.warn('⚠️  No se guardaron alertas:', e.message));
+        cache = { datos: resumen, expira: Date.now() + config.clima.refrescoMin * 60 * 1000, error: null };
+    }
+    return resumen;
+}
+
 function iniciarActualizacionPeriodica() {
     const ms = config.clima.refrescoMin * 60 * 1000;
     const tarea = () => obtenerResumen({ forzar: true })
@@ -342,4 +413,4 @@ function iniciarActualizacionPeriodica() {
     setInterval(tarea, ms).unref();
 }
 
-module.exports = { obtenerResumen, iniciarActualizacionPeriodica, invalidar, tiempoViaje, nivelPorLluvia, construirResumen };
+module.exports = { fuentes, procesarExterno, obtenerResumen, iniciarActualizacionPeriodica, invalidar, tiempoViaje, nivelPorLluvia, construirResumen };

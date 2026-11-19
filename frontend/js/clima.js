@@ -6,7 +6,7 @@
 //   - Lluvia en movimiento: malla horaria animada (/api/clima/lluvia)
 //   - Caudal modelado GloFAS
 // =====================================================================
-import { get } from './api.js';
+import { get, post } from './api.js';
 import { estado, esPersonal } from './estado.js';
 import { esc, numero, fechaHora, diaSemana, hoyLima, NIVEL, colorNivel, toast, conCarga } from './ui.js';
 import { dibujar, opcionesBase, temaGraficos } from './graficos.js';
@@ -19,12 +19,58 @@ let vistaMapa = 'cuenca';
 // Lluvia en movimiento
 const lluvia = { mapa: null, capa: null, datos: null, imagenes: [], frame: 0, timer: null, vel: 450, cargado: 0 };
 
-export async function obtenerClima(forzar = false) {
-    estado.clima = await get(`/clima/resumen${forzar ? '?forzar=1' : ''}`);
-    return estado.clima;
+// ---------- Pronóstico (servidor y, si falla, consulta directa del navegador) ----------
+let fuentesClima = null;
+let climaEnCurso = null;
+
+async function abrirDirecto(url) {
+    const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error(`Open-Meteo respondió ${r.status}`);
+    return r.json();
+}
+
+/**
+ * Si Open-Meteo bloquea la IP compartida del servidor (HTTP 429), el navegador
+ * consulta con su propia conexión y el servidor solo procesa los datos.
+ */
+async function climaDesdeNavegador() {
+    fuentesClima ||= await get('/clima/fuentes');
+    const [p, c] = await Promise.allSettled([abrirDirecto(fuentesClima.pronostico), abrirDirecto(fuentesClima.caudal)]);
+    if (p.status === 'rejected') throw p.reason;
+    const lista = Array.isArray(p.value) ? p.value : [p.value];
+    return post('/clima/resumen-externo', {
+        pronosticos: lista.map(x => ({ daily: x.daily, hourly: { time: x.hourly.time, precipitation: x.hourly.precipitation } })),
+        caudal: c.status === 'fulfilled' && c.value?.daily ? { daily: c.value.daily } : null,
+    });
+}
+
+async function mallaDesdeNavegador() {
+    fuentesClima ||= await get('/clima/fuentes');
+    const r = await abrirDirecto(fuentesClima.malla);
+    const lista = Array.isArray(r) ? r : [r];
+    const horas = lista[0].hourly.time;
+    const valores = horas.map((_, h) => lista.map(x => Math.max(0, Number(x.hourly.precipitation[h]) || 0)));
+    return post('/clima/lluvia-externo', { horas, valores });
+}
+
+export function obtenerClima(forzar = false) {
+    // Una sola consulta a la vez (la franja de alerta y la vista piden lo mismo)
+    if (climaEnCurso && !forzar) return climaEnCurso;
+    climaEnCurso = (async () => {
+        try {
+            estado.clima = await get(`/clima/resumen${forzar ? '?forzar=1' : ''}`);
+        } catch (err) {
+            if (err.estado !== 503) throw err;
+            try { estado.clima = await climaDesdeNavegador(); }
+            catch (e2) { console.warn('Respaldo de clima falló:', e2.message); throw err; }
+        }
+        return estado.clima;
+    })().finally(() => { climaEnCurso = null; });
+    return climaEnCurso;
 }
 
 export async function cargarClima(forzar = false) {
+    crearMapa();                       // el mapa se ve aunque el pronóstico no cargue
     if (vistaMapa === 'lluvia') cargarLluvia(forzar).catch(() => {});
     const c = forzar || !estado.clima ? await obtenerClima(forzar) : estado.clima;
     const futuros = diasFuturos(c);
@@ -256,10 +302,30 @@ function capaFondo() {
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 17, opacity: 0.9 }),
         ]);
     }
-    const claro = document.documentElement.dataset.theme === 'light';
-    return L.tileLayer(`https://{s}.basemaps.cartocdn.com/${claro ? 'light_all' : 'dark_all'}/{z}/{x}/{y}{r}.png`, {
-        attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 14,
-    });
+    if (fondo === 'osm') {
+        return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '&copy; OpenStreetMap' });
+    }
+    // Mapa base sin llave (Esri Canvas): gris oscuro o claro según el tema
+    const tono = document.documentElement.dataset.theme === 'light' ? 'Light' : 'Dark';
+    const esri = s => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${tono}_Gray_${s}/MapServer/tile/{z}/{y}/{x}`;
+    return L.layerGroup([
+        L.tileLayer(esri('Base'), { maxZoom: 16, attribution: 'Mapa &copy; Esri, HERE, Garmin, &copy; OpenStreetMap' }),
+        L.tileLayer(esri('Reference'), { maxZoom: 16 }),
+    ]);
+}
+
+/** Si el proveedor del fondo falla varias veces, se cambia a OpenStreetMap. */
+function vigilarFondo(m, ref) {
+    let errores = 0;
+    const capas = ref.base.getLayers ? ref.base.getLayers() : [ref.base];
+    capas.forEach(l => l.on('tileerror', () => {
+        if (++errores === 6 && fondo === 'mapa') {
+            console.warn('Fondo del mapa sin respuesta: se usa OpenStreetMap');
+            fondo = 'osm';
+            ponerFondo(m, ref);
+            fondo = 'mapa';
+        }
+    }));
 }
 
 /** Leaflet calcula mal el tamaño si el mapa nace oculto: se corrige al cambiar el tamaño del contenedor. */
@@ -287,19 +353,24 @@ function vigilarTamano(m, el) {
 function ponerFondo(m, ref) {
     if (ref.base) m.removeLayer(ref.base);
     ref.base = capaFondo().addTo(m);
-    ref.base.bringToBack?.();
-    ref.base.eachLayer?.(l => l.bringToBack?.());
+    ref.base.eachLayer ? ref.base.eachLayer(l => l.setZIndex?.(0)) : ref.base.setZIndex?.(0);
+    if (fondo === 'mapa') vigilarFondo(m, ref);
 }
 
-function iniciarMapa(c) {
-    if (!window.L) { document.getElementById('mapa-leaflet').innerHTML = '<p class="cargando">No se pudo cargar el mapa.</p>'; return; }
-    if (!mapa) {
+function crearMapa() {
+    if (!window.L || mapa) return;
+    {
         const el = document.getElementById('mapa-leaflet');
         mapa = L.map(el, { zoomControl: false, scrollWheelZoom: false, attributionControl: true }).setView([-13.75, -75.35], 8);
         L.control.zoom({ position: 'topright' }).addTo(mapa);
         ponerFondo(mapa, capas);
         vigilarTamano(mapa, el);
     }
+}
+
+function iniciarMapa(c) {
+    if (!window.L) { document.getElementById('mapa-leaflet').innerHTML = '<p class="cargando">No se pudo cargar el mapa.</p>'; return; }
+    crearMapa();
     capas.puntos?.remove();
     capas.puntos = L.layerGroup().addTo(mapa);
     const boc = c.puntos.find(p => p.tipo === 'bocatoma');
@@ -499,7 +570,13 @@ async function cargarLluvia(forzar = false) {
     if (!forzar && lluvia.datos && Date.now() - lluvia.cargado < 15 * 60e3) { asegurarMapaLluvia(); return; }
     carg.classList.remove('hidden');
     try {
-        const d = await get(`/clima/lluvia${forzar ? '?forzar=1' : ''}`);
+        let d;
+        try { d = await get(`/clima/lluvia${forzar ? '?forzar=1' : ''}`); }
+        catch (err) {
+            if (err.estado !== 503) throw err;
+            try { d = await mallaDesdeNavegador(); }
+            catch (e2) { console.warn('Respaldo de lluvia falló:', e2.message); throw err; }
+        }
         lluvia.datos = d;
         lluvia.cargado = Date.now();
         lluvia.imagenes = imagenesMalla(d);
@@ -677,7 +754,7 @@ export function iniciarClima() {
     window.addEventListener('tema-cambiado', () => {
         if (mapa && fondo === 'mapa') ponerFondo(mapa, capas);
         if (lluvia.mapa && fondo === 'mapa') ponerFondo(lluvia.mapa, lluvia);
-        if (nasa.mapa && fondo === 'mapa') { ponerFondo(nasa.mapa, nasa); nasa.base.bringToBack?.(); }
+        if (nasa.mapa && fondo === 'mapa') ponerFondo(nasa.mapa, nasa);
         if (estado.vista === 'clima' && estado.clima) { pintarPerfil(estado.clima); pintarChips(estado.clima); pintarRio(estado.clima); if (lluvia.datos) pintarGraficoLluvia(lluvia.datos); }
     });
 }

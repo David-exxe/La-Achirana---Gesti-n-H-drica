@@ -37,6 +37,7 @@ app.use('/api', cors({
 // Fotos de voucher y QR necesitan un límite mayor; el resto de la API, 50 KB
 app.use('/api/pagos/reportar', express.json({ limit: '5mb' }));
 app.use('/api/admin/cuentas-cobro', express.json({ limit: '1mb' }));
+app.use(['/api/clima/resumen-externo', '/api/clima/lluvia-externo'], express.json({ limit: '400kb' }));
 app.use(express.json({ limit: '50kb' }));
 // Verificación de salud (Render la usa para saber si el servicio está vivo)
 app.get('/api/salud', async (req, res) => {

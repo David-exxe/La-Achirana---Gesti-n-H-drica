@@ -21,6 +21,28 @@ async function resumen(req, res) {
     }
 }
 
+/** URLs de Open-Meteo para que el navegador consulte directo si el servidor está bloqueado. */
+async function fuentes(req, res) {
+    res.json({ ...(await clima.fuentes()), malla: lluvia.urlMalla() });
+}
+
+/** Datos traídos por el navegador: se validan y se procesan. Solo el personal los guarda para todos. */
+async function resumenExterno(req, res) {
+    try {
+        res.json(await clima.procesarExterno(req.body, { confiable: req.sesion.tipo === 'usuario' }));
+    } catch (err) {
+        throw new ErrorHttp(400, `No se pudo procesar el pronóstico: ${err.message}`);
+    }
+}
+
+async function mallaExterna(req, res) {
+    try {
+        res.json(await lluvia.procesarExterno(req.body, { confiable: req.sesion.tipo === 'usuario' }));
+    } catch (err) {
+        throw new ErrorHttp(400, `No se pudo procesar la lluvia: ${err.message}`);
+    }
+}
+
 /** Malla horaria de lluvia (pasado 24 h + próximas 48 h) para la animación. */
 async function malla(req, res) {
     try {
@@ -97,5 +119,5 @@ async function historial(req, res) {
     res.json(rows);
 }
 
-module.exports = {
+module.exports = { fuentes, resumenExterno, mallaExterna,
     malla, resumen, listarPuntos, crearPunto, actualizarPunto, eliminarPunto, historial };

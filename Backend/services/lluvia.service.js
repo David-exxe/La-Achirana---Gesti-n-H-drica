@@ -33,12 +33,15 @@ function celdas() {
     return out;
 }
 
-async function consultarOpenMeteo() {
+function urlMalla() {
     const c = celdas();
-    const url = 'https://api.open-meteo.com/v1/forecast'
+    return 'https://api.open-meteo.com/v1/forecast'
         + `?latitude=${c.map(x => x[0]).join(',')}&longitude=${c.map(x => x[1]).join(',')}`
         + '&hourly=precipitation&past_days=1&forecast_days=2&timezone=America%2FLima';
-    const lista = await obtenerJson(url);
+}
+
+async function consultarOpenMeteo() {
+    const lista = await obtenerJson(urlMalla());
     const arr = Array.isArray(lista) ? lista : [lista];
     const horas = arr[0].hourly.time;
     const valores = horas.map((_, h) => arr.map(p => Math.round((p.hourly.precipitation[h] || 0) * 10) / 10));
@@ -138,4 +141,17 @@ async function obtenerMalla({ forzar = false } = {}) {
     }
 }
 
-module.exports = { obtenerMalla, simular, resumir, celdas, LAT, LON };
+/** Malla calculada por el navegador ({horas, valores}); se valida y, si es del personal, se guarda. */
+async function procesarExterno(cuerpo, { confiable = false } = {}) {
+    const n = celdas().length;
+    const { horas, valores } = cuerpo || {};
+    if (!Array.isArray(horas) || horas.length < 24 || horas.length > 96 || !horas.every(h => typeof h === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(h))) throw new Error('Horas no válidas.');
+    if (!Array.isArray(valores) || valores.length !== horas.length || !valores.every(f => Array.isArray(f) && f.length === n && f.every(v => typeof v === 'number' && v >= 0 && v <= 300))) throw new Error('Valores de lluvia no válidos.');
+    const crudo = { horas, valores: valores.map(f => f.map(v => Math.round(v * 10) / 10)), simulacion: false };
+    if (confiable) await cacheExt.guardar(CLAVE, { ...crudo, celdas: n });
+    const datos = { ...resumir(crudo), actualizado: new Date().toISOString(), desactualizado: false, fuente_navegador: true };
+    if (confiable) cache = { datos, expira: Date.now() + VIGENCIA_MIN * 60e3 };
+    return datos;
+}
+
+module.exports = { urlMalla, procesarExterno, obtenerMalla, simular, resumir, celdas, LAT, LON };
