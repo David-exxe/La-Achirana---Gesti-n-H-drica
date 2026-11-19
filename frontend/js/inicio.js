@@ -43,7 +43,25 @@ function pintarMetricas(c, r, coti) {
     document.getElementById('m-pend').innerHTML = `${numero(r.volumen_pendiente, 0)}<small>m³</small>`;
     document.getElementById('m-pend-sub').textContent = `${numero(r.volumen_total, 0)} m³ entregados en total`;
     document.getElementById('m-deuda').textContent = soles(coti.monto);
-    document.getElementById('m-deuda-sub').textContent = coti.lecturas ? `${coti.lecturas} lectura(s) sin pagar` : 'Estás al día';
+    const deuda = document.getElementById('m-deuda');
+    deuda.classList.toggle('val-largo', soles(coti.monto).length > 11);
+    const sub = document.getElementById('m-deuda-sub');
+    sub.textContent = coti.lecturas ? `${coti.lecturas} lectura(s) sin pagar` : 'Estás al día';
+    // Atajo: lleva al recuadro de pago
+    if (coti.lecturas && coti.monto > 0 && !coti.en_validacion) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn btn-arena btn-sm ir-pagar';
+        b.innerHTML = '<i class="fa-solid fa-wallet"></i> Pagar ahora';
+        b.addEventListener('click', () => {
+            const panel = document.getElementById('panel-pago');
+            panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            panel.classList.remove('resaltar'); void panel.offsetWidth; panel.classList.add('resaltar');
+        });
+        sub.append(document.createElement('br'), b);
+    } else if (coti.en_validacion) {
+        sub.textContent = 'Pago en validación';
+    }
 }
 
 function pintarLecturas(lecturas) {

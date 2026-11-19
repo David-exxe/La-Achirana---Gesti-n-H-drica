@@ -927,3 +927,9 @@ button.medio-card:hover, button.medio-card:focus-visible { transform: translateY
     .panel-mapa .mapa-tabs { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
     .arriba-der { top: auto; bottom: 56px; right: 12px; }
 }
+
+/* Atajo "Pagar ahora" y montos grandes */
+.metrica .val.val-largo { font-size: 22px; }
+.ir-pagar { margin-top: 10px; }
+@keyframes resaltar { 0%, 100% { box-shadow: var(--shadow); } 40% { box-shadow: 0 0 0 3px var(--arena), var(--shadow); } }
+#panel-pago.resaltar { animation: resaltar 1.4s ease 2; }
