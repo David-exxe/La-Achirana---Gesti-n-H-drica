@@ -17,6 +17,8 @@
 // =====================================================================
 const config = require('../Config/env');
 const { query } = require('../Config/db');
+const cacheExt = require('./cacheExterno');
+const CLAVE = 'clima_cuenca';
 
 const NIVELES = ['verde', 'amarillo', 'naranja', 'rojo'];
 const TEXTO_NIVEL = { verde: 'sin lluvia relevante', amarillo: 'lluvia moderada', naranja: 'lluvia fuerte', rojo: 'lluvia muy fuerte' };
@@ -276,15 +278,41 @@ async function refrescar() {
     const { rows: puntos } = await query('SELECT * FROM puntos_monitoreo WHERE activo ORDER BY altitud_m DESC');
     if (!puntos.length) throw new Error('No hay puntos de monitoreo activos.');
     const simulacion = process.env.CLIMA_SIMULACION === 'true';
-    const datos = simulacion ? datosSimulados(puntos) : await consultarServicios(puntos);
+    let datos, desdeBd = null;
+    if (simulacion) datos = datosSimulados(puntos);
+    else {
+        // 1) Dato guardado en la BD todavía vigente → no se consulta Open-Meteo
+        const guardado = await cacheExt.leer(CLAVE);
+        const vigente = guardado && Date.now() - guardado.actualizado < config.clima.refrescoMin * 60e3;
+        if (vigente || (guardado && cacheExt.enPausa(CLAVE))) {
+            datos = guardado.datos; desdeBd = guardado;
+        } else if (cacheExt.enPausa(CLAVE)) {
+            throw new Error(`Open-Meteo está limitando las consultas; se reintenta en ${cacheExt.minutosPausa(CLAVE)} min`);
+        } else {
+            try {
+                datos = await consultarServicios(puntos);
+                await cacheExt.guardar(CLAVE, datos);
+            } catch (err) {
+                cacheExt.pausar(CLAVE, err);
+                if (!guardado) throw err;
+                datos = guardado.datos; desdeBd = { ...guardado, error: err.message };   // último dato bueno
+            }
+        }
+    }
     const resumen = construirResumen(puntos, datos);
+    if (desdeBd) {
+        resumen.actualizado = new Date(desdeBd.actualizado).toISOString();
+        if (desdeBd.error || Date.now() - desdeBd.actualizado > config.clima.refrescoMin * 60e3) resumen.desactualizado = true;
+    }
     if (simulacion) {
         resumen.simulacion = true;
         resumen.fuente = 'DATOS SIMULADOS (CLIMA_SIMULACION=true)';
         return (cache = { datos: resumen, expira: Date.now() + 5 * 60 * 1000, error: null }).datos; // no se guarda en BD
     }
     await guardarAlertas(resumen).catch(e => console.warn('⚠️  No se guardaron alertas:', e.message));
-    cache = { datos: resumen, expira: Date.now() + config.clima.refrescoMin * 60 * 1000, error: null };
+    // si se sirvió un dato viejo, se vuelve a intentar cuando termine la pausa
+    const espera = resumen.desactualizado ? Math.max(5, cacheExt.minutosPausa(CLAVE)) : config.clima.refrescoMin;
+    cache = { datos: resumen, expira: Date.now() + espera * 60 * 1000, error: null };
     return resumen;
 }
 

@@ -6,11 +6,15 @@
 //   - Con CLIMA_SIMULACION=true genera una tormenta de ejemplo.
 // =====================================================================
 const config = require('../Config/env');
+const cacheExt = require('./cacheExterno');
 
-// Malla de 9 × 8 puntos (paso 0.15°) que cubre cabeceras, bocatoma y valle
-const LAT = Array.from({ length: 9 }, (_, i) => +(-13.05 - i * 0.15).toFixed(2));    // -13.05 … -14.25
-const LON = Array.from({ length: 8 }, (_, j) => +(-75.9 + j * 0.15).toFixed(2));     // -75.90 … -74.85
-const PASO = 0.15;
+// Malla de 7 × 6 puntos (paso 0.2°) que cubre cabeceras, bocatoma y valle.
+// Open-Meteo cuenta cada punto como una consulta: 42 puntos cada 2 h.
+const LAT = Array.from({ length: 7 }, (_, i) => +(-13.05 - i * 0.2).toFixed(2));     // -13.05 … -14.25
+const LON = Array.from({ length: 6 }, (_, j) => +(-75.9 + j * 0.2).toFixed(2));      // -75.90 … -74.90
+const PASO = 0.2;
+const CLAVE = 'lluvia_malla';
+const VIGENCIA_MIN = 120;
 // Celdas de "sierra" (aguas arriba de la bocatoma, al noreste)
 const esSierra = (la, lo) => la > -13.95 && lo > -75.55;
 
@@ -68,7 +72,7 @@ function simular() {
     return { horas, valores, simulacion: true };
 }
 
-function resumir({ horas, valores, simulacion }) {
+function resumir({ horas, valores, simulacion = false }) {
     const c = celdas();
     const idxSierra = c.map((x, i) => (esSierra(x[0], x[1]) ? i : -1)).filter(i => i >= 0);
     const idxValle = c.map((x, i) => (!esSierra(x[0], x[1]) ? i : -1)).filter(i => i >= 0);
@@ -94,9 +98,35 @@ async function obtenerMalla({ forzar = false } = {}) {
     if (!forzar && cache.datos && Date.now() < cache.expira) return cache.datos;
     if (!enCurso) {
         enCurso = (async () => {
-            const sim = process.env.CLIMA_SIMULACION === 'true';
-            const datos = resumir(sim ? simular() : await consultarOpenMeteo());
-            cache = { datos, expira: Date.now() + (sim ? 5 : Math.max(30, config.clima?.refrescoMin || 60)) * 60 * 1000 };
+            if (process.env.CLIMA_SIMULACION === 'true') {
+                const datos = resumir(simular());
+                cache = { datos, expira: Date.now() + 5 * 60e3 };
+                return datos;
+            }
+            let guardado = await cacheExt.leer(CLAVE);
+            if (guardado && guardado.datos?.celdas !== celdas().length) guardado = null;   // malla de otra versión
+            const edadMin = guardado ? (Date.now() - guardado.actualizado) / 60e3 : Infinity;
+            let crudo, desactualizado = false, actualizado = guardado?.actualizado;
+            if (guardado && (edadMin < VIGENCIA_MIN || cacheExt.enPausa(CLAVE)) && !(forzar && !cacheExt.enPausa(CLAVE))) {
+                crudo = guardado.datos;
+                desactualizado = edadMin >= VIGENCIA_MIN;
+            } else if (cacheExt.enPausa(CLAVE)) {
+                throw new Error(`Open-Meteo está limitando las consultas; se reintenta en ${cacheExt.minutosPausa(CLAVE)} min`);
+            } else {
+                try {
+                    crudo = await consultarOpenMeteo();
+                    // si cambió la malla (versión anterior), no se reutiliza lo guardado
+                    await cacheExt.guardar(CLAVE, { ...crudo, celdas: celdas().length });
+                    actualizado = Date.now();
+                } catch (err) {
+                    cacheExt.pausar(CLAVE, err);
+                    if (!guardado) throw err;
+                    crudo = guardado.datos; desactualizado = true;
+                }
+            }
+            const datos = { ...resumir(crudo), actualizado: new Date(actualizado).toISOString(), desactualizado };
+            const espera = desactualizado ? Math.max(5, cacheExt.minutosPausa(CLAVE)) : Math.max(15, VIGENCIA_MIN - Math.floor(edadMin === Infinity ? 0 : edadMin));
+            cache = { datos, expira: Date.now() + espera * 60e3 };
             return datos;
         })().finally(() => { enCurso = null; });
     }

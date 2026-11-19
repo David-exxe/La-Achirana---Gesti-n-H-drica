@@ -340,6 +340,14 @@ const migraciones = [
         nombre: '2026_11_pagos_email_contacto',
         sql: `ALTER TABLE pagos ADD COLUMN IF NOT EXISTS email_contacto VARCHAR(120);`,
     },
+    {
+        nombre: '2026_11_cache_externo',
+        sql: `CREATE TABLE IF NOT EXISTS cache_externo (
+                  clave       VARCHAR(40) PRIMARY KEY,
+                  datos       JSONB NOT NULL,
+                  actualizado TIMESTAMPTZ NOT NULL DEFAULT now()
+              );`,
+    },
 ];
 
 // Puntos por defecto: cuenca alta del río Ica (Huancavelica) y bocatoma La Achirana.

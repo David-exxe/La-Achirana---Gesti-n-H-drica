@@ -45,12 +45,15 @@ export const cssVar = v => getComputedStyle(document.documentElement).getPropert
 
 // ---------------- Toasts ----------------
 export function toast(mensaje, tipo = 'info', ms = 4800) {
+    // No repetir el mismo aviso si ya está en pantalla
+    const caja = document.getElementById('toasts');
+    if ([...caja.children].some(t => t.lastElementChild?.textContent === mensaje)) return;
     const iconos = { ok: 'fa-circle-check', error: 'fa-circle-exclamation', info: 'fa-circle-info', aviso: 'fa-triangle-exclamation' };
     const el = document.createElement('div');
     el.className = `toast ${tipo}`;
     el.innerHTML = `<i class="fa-solid ${iconos[tipo] || iconos.info}"></i><div></div>`;
     el.lastElementChild.textContent = mensaje;
-    document.getElementById('toasts').appendChild(el);
+    caja.appendChild(el);
     setTimeout(() => el.remove(), ms);
 }
 

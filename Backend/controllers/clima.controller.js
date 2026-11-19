@@ -4,12 +4,20 @@ const lluvia = require('../services/lluvia.service');
 const { ErrorHttp, entero, limpiar, RE } = require('../utils/validacion');
 const auditoria = require('../services/auditoria.service');
 
+/** Mensaje corto para el usuario; el detalle técnico queda en el log. */
+function mensajeClima(err) {
+    console.warn('⚠️  Clima:', err.message);
+    return /429|limitando/.test(err.message)
+        ? 'El pronóstico está saturado en este momento. Vuelve a intentarlo en unos minutos.'
+        : 'El pronóstico no está disponible en este momento. Se reintentará automáticamente.';
+}
+
 async function resumen(req, res) {
     const forzar = req.query.forzar === '1' && req.sesion.tipo === 'usuario';
     try {
         res.json(await clima.obtenerResumen({ forzar }));
     } catch (err) {
-        throw new ErrorHttp(503, `El servicio de clima no está disponible ahora (${err.message}). Se reintentará automáticamente.`);
+        throw new ErrorHttp(503, mensajeClima(err));
     }
 }
 
@@ -18,7 +26,7 @@ async function malla(req, res) {
     try {
         res.json(await lluvia.obtenerMalla({ forzar: req.query.forzar === '1' && req.sesion.tipo === 'usuario' }));
     } catch (err) {
-        throw new ErrorHttp(503, `El pronóstico de lluvia no está disponible ahora (${err.message}).`);
+        throw new ErrorHttp(503, mensajeClima(err));
     }
 }
 
