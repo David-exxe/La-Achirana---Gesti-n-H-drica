@@ -4,7 +4,7 @@
 import { get, post, token } from './api.js';
 import { estado, esPersonal, esAdmin, esCliente, esStaff, esGerente, esGestion } from './estado.js';
 import { esc, toast, conCarga, iniciales, NIVEL, colorNivel } from './ui.js';
-import { activarValidacionEnVivo, validarFormulario, erroresServidor, limpiarErrores, datosFormulario } from './validacion.js';
+import { activarValidacionEnVivo, validarFormulario, erroresServidor, limpiarErrores, datosFormulario, mostrarError, rucValido, problemaEmail } from './validacion.js';
 import { redibujarTodo } from './graficos.js';
 import { cargarInicio, iniciarInicio } from './inicio.js';
 import { cargarPagos, iniciarPagos } from './pagos.js';
@@ -19,22 +19,60 @@ const permitida = v => VISTAS[v] && (v !== 'admin' || esAdmin()) && (v !== 'gere
 const $ = id => document.getElementById(id);
 
 // ---------------------------------------------------------------- Login
+const LARGO_DOC = { DNI: 8, RUC: 11 };
+
 function modoLogin(modo) {
     document.querySelectorAll('[data-modo]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.modo === modo)));
-    $('form-login-cliente').classList.toggle('hidden', modo !== 'cliente');
-    $('form-login-admin').classList.toggle('hidden', modo !== 'admin');
-    (modo === 'cliente' ? $('lc-doc') : $('la-email')).focus();
+    const esCorreo = modo === 'correo';
+    $('form-login-cliente').classList.toggle('hidden', esCorreo);
+    $('form-login-admin').classList.toggle('hidden', !esCorreo);
+    if (!esCorreo) {
+        if ($('lc-tipo').value !== modo) $('lc-doc').value = '';
+        $('lc-tipo').value = modo;
+        ajustarDocLogin();
+    }
+    (esCorreo ? $('la-email') : $('lc-doc')).focus();
 }
 
 function ajustarDocLogin() {
-    const esRuc = $('lc-tipo').value === 'RUC';
+    const tipo = $('lc-tipo').value;
     const input = $('lc-doc');
-    input.dataset.validar = esRuc ? 'ruc-login' : 'dni';
-    input.maxLength = esRuc ? 11 : 8;
-    input.placeholder = esRuc ? '11 dígitos' : '8 dígitos';
-    input.closest('.field').querySelector('label').textContent = esRuc ? 'Número de RUC' : 'Número de DNI';
-    if (input.value.length > input.maxLength) input.value = input.value.slice(0, input.maxLength);
+    const largo = LARGO_DOC[tipo];
+    input.dataset.validar = tipo === 'RUC' ? 'ruc-login' : 'dni';
+    input.maxLength = largo;
+    input.placeholder = '0'.repeat(largo);
+    $('lc-doc-label').textContent = tipo === 'RUC' ? 'Número de RUC' : 'Número de DNI';
+    if (input.value.length > largo) input.value = input.value.slice(0, largo);
     limpiarErrores($('form-login-cliente'));
+    contarDoc();
+}
+
+/** Contador 0/8 y marca de "completo". */
+function contarDoc() {
+    const input = $('lc-doc');
+    const largo = LARGO_DOC[$('lc-tipo').value];
+    const n = input.value.length;
+    const c = $('lc-contador');
+    c.textContent = `${n}/${largo}`;
+    const completo = n === largo && !REGLA_DOC(input);
+    c.classList.toggle('completo', completo);
+    input.closest('.input-icono').classList.toggle('valido', completo);
+}
+const REGLA_DOC = input => (input.dataset.validar === 'dni' ? !/^\d{8}$/.test(input.value) : !/^(10|15|16|17|20)\d{9}$/.test(input.value) || !rucValido(input.value));
+
+/** Solo deja escribir dígitos (también al pegar) y avisa al instante. */
+function soloDigitos(input, alAvisar) {
+    input.addEventListener('beforeinput', e => {
+        if (e.data && /\D/.test(e.data) && e.inputType.startsWith('insert')) {
+            e.preventDefault();
+            alAvisar?.('Solo números.');
+        }
+    });
+}
+
+function marcarEmail() {
+    const input = $('la-email');
+    input.closest('.input-icono').classList.toggle('valido', !problemaEmail(input.value.trim()));
 }
 
 async function loginCliente(e) {
@@ -66,6 +104,7 @@ async function loginAdmin(e) {
     } catch (err) {
         erroresServidor(f, err.campos);
         $('la-pass').value = '';
+        marcarEmail();
         toast(err.message, 'error');
     }
 }
@@ -204,7 +243,13 @@ function eventosGlobales() {
         }
     });
     document.querySelectorAll('[data-modo]').forEach(b => b.addEventListener('click', () => modoLogin(b.dataset.modo)));
-    $('lc-tipo').addEventListener('change', ajustarDocLogin);
+    const doc = $('lc-doc');
+    soloDigitos(doc, msg => { mostrarError(doc, msg); setTimeout(() => { if (doc.getAttribute('aria-invalid') === 'true' && doc.value.length < doc.maxLength) mostrarError(doc, null); }, 1400); });
+    soloDigitos($('lc-pin'), msg => mostrarError($('lc-pin'), msg));
+    doc.addEventListener('input', contarDoc);
+    $('la-email').addEventListener('input', marcarEmail);
+    // Sin espacios en el correo
+    $('la-email').addEventListener('beforeinput', e => { if (e.data && /\s/.test(e.data)) { e.preventDefault(); mostrarError($('la-email'), 'El correo no lleva espacios.'); } });
     $('form-login-cliente').addEventListener('submit', loginCliente);
     $('form-login-admin').addEventListener('submit', loginAdmin);
     $('sel-cliente').addEventListener('change', e => {

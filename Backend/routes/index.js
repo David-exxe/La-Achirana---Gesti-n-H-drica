@@ -63,6 +63,9 @@ r.get('/pagos/:id/voucher', pagos.voucher);
 r.post('/admin/pagos/manual', requiereAdmin(), pagos.pagoManual);
 r.get('/admin/pagos/por-validar', requiereAdmin('gerente'), pagos.porValidar);
 r.post('/admin/pagos/:id/validar', requiereAdmin(), pagos.validar);
+r.get('/admin/correo/estado', requiereAdmin(), pagos.estadoCorreo);
+r.post('/admin/correo/prueba', requiereAdmin(), pagos.probarCorreo);
+r.get('/admin/culqi/diagnostico', requiereAdmin(), pagos.diagnosticoCulqi);
 r.get('/admin/recaudacion-total', requiereAdmin('gerente'), pagos.recaudacion);
 r.get('/admin/cuentas-cobro', requiereAdmin(), pagos.listarCuentas);
 r.post('/admin/cuentas-cobro', requiereAdmin(), pagos.crearCuenta);
@@ -83,6 +86,7 @@ r.put('/admin/riego/parametros', requiereAdmin(), turnos.guardarParametros);
 
 // Clima y alertas
 r.get('/clima/resumen', clima.resumen);
+r.get('/clima/lluvia', clima.malla);
 r.get('/admin/clima/puntos', requiereAdmin(), clima.listarPuntos);
 r.post('/admin/clima/puntos', requiereAdmin(), clima.crearPunto);
 r.put('/admin/clima/puntos/:id', requiereAdmin(), clima.actualizarPunto);

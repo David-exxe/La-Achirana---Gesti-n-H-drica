@@ -97,6 +97,14 @@ const config = {
         rsaPublicKey: (process.env.CULQI_RSA_PUBLIC_KEY || '').replace(/\\n/g, '\n').trim(),
         montoMinimo: num(process.env.CULQI_MONTO_MINIMO, 1),
         yape: bool(process.env.CULQI_YAPE, true),
+        // Solo para pruebas locales con un simulador; en Render déjalo vacío.
+        apiUrl: (process.env.CULQI_API_URL || 'https://api.culqi.com/v2').replace(/\/+$/, ''),
+    },
+    // Microservicio de correo (carpeta servicio-correo/, segundo servicio en Render)
+    correo: {
+        url: (process.env.CORREO_SERVICIO_URL || '').trim().replace(/\/+$/, ''),
+        clave: (process.env.CORREO_CLAVE || '').trim(),
+        junta: (process.env.NOTIFICAR_PAGOS_A || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
     },
     clima: {
         umbrales: umbrales.length === 3 ? umbrales : [5, 15, 30],
@@ -109,6 +117,8 @@ const config = {
 config.esHttps = config.urlPublica.startsWith('https://');
 config.culqi.activo = Boolean(config.culqi.publicKey && config.culqi.secretKey);
 config.culqi.pruebas = config.culqi.secretKey.startsWith('sk_test_');
+// En Render, fromService entrega solo el host del servicio de correo (sin https://)
+if (config.correo.url && !/^https?:\/\//.test(config.correo.url)) config.correo.url = `https://${config.correo.url}`;
 // Modo demostración: formulario de tarjeta y Yape simulados (no cobra). Solo si no hay Culqi.
 config.pagosDemo = !config.culqi.activo && bool(process.env.PAGOS_DEMO, process.env.NODE_ENV !== 'production');
 

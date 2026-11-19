@@ -8,7 +8,7 @@
 const config = require('../Config/env');
 const { ErrorHttp } = require('../utils/validacion');
 
-const API = 'https://api.culqi.com/v2';
+const API = () => config.culqi.apiUrl;
 
 /** Datos públicos para abrir el checkout en el navegador. */
 function configuracionPublica() {
@@ -42,7 +42,7 @@ async function crearCargo({ token, monto, email, descripcion, metadata }) {
     let respuesta;
     let datos;
     try {
-        respuesta = await fetch(`${API}/charges`, {
+        respuesta = await fetch(`${API()}/charges`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.culqi.secretKey}` },
             body: JSON.stringify(cuerpo),
@@ -80,4 +80,42 @@ async function crearCargo({ token, monto, email, descripcion, metadata }) {
     };
 }
 
-module.exports = { configuracionPublica, crearCargo };
+/**
+ * Diagnóstico para el panel: revisa el formato de las llaves y hace una
+ * consulta de solo lectura a Culqi (no cobra nada).
+ */
+async function diagnostico() {
+    const c = config.culqi;
+    const pk = c.publicKey, sk = c.secretKey;
+    const modoPk = /^pk_test_/.test(pk) ? 'prueba' : /^pk_live_/.test(pk) ? 'produccion' : null;
+    const modoSk = /^sk_test_/.test(sk) ? 'prueba' : /^sk_live_/.test(sk) ? 'produccion' : null;
+    const chequeos = [
+        { id: 'publica', ok: Boolean(modoPk), detalle: pk ? (modoPk ? `Llave pública de ${modoPk}` : 'La llave pública debe empezar con pk_test_ o pk_live_') : 'Falta CULQI_PUBLIC_KEY' },
+        { id: 'secreta', ok: Boolean(modoSk), detalle: sk ? (modoSk ? `Llave secreta de ${modoSk}` : 'La llave secreta debe empezar con sk_test_ o sk_live_') : 'Falta CULQI_SECRET_KEY' },
+        { id: 'pareja', ok: Boolean(modoPk && modoSk && modoPk === modoSk), detalle: !(modoPk && modoSk) ? 'Faltan llaves para comparar el entorno' : modoPk !== modoSk ? 'Una llave es de prueba y la otra de producción' : 'Ambas llaves son del mismo entorno' },
+        { id: 'rsa', ok: true, detalle: c.rsaId && c.rsaPublicKey ? 'Cifrado RSA configurado' : 'Sin cifrado RSA (opcional)' },
+    ];
+    let conexion = { ok: false, detalle: 'No se probó: faltan llaves válidas.' };
+    if (modoSk) {
+        try {
+            const r = await fetch(`${API()}/charges?limit=1`, { headers: { Authorization: `Bearer ${sk}` }, signal: AbortSignal.timeout(15000) });
+            const d = await r.json().catch(() => ({}));
+            conexion = r.ok
+                ? { ok: true, detalle: 'Culqi aceptó la llave secreta.' }
+                : { ok: false, detalle: d.merchant_message || d.user_message || `Culqi respondió ${r.status}` };
+        } catch (err) {
+            conexion = { ok: false, detalle: `Sin respuesta de Culqi: ${err.message}` };
+        }
+    }
+    chequeos.push({ id: 'conexion', ...conexion });
+    return {
+        activo: c.activo, modo: modoSk || modoPk || null, yape: c.yape,
+        listo: chequeos.every(x => x.ok), chequeos,
+        // Más tarjetas de prueba: https://docs.culqi.com (sección Tarjetas de prueba)
+        tarjetasPrueba: modoSk === 'prueba' ? [
+            { marca: 'Visa', numero: '4111 1111 1111 1111', vence: 'fecha futura', cvv: '123', resultado: 'Aprobada' },
+        ] : [],
+    };
+}
+
+module.exports = { configuracionPublica, crearCargo, diagnostico };

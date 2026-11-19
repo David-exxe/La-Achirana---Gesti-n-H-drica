@@ -22,6 +22,23 @@ const RE = {
 };
 
 /** Dígito verificador del RUC (módulo 11, SUNAT). */
+/** Explica qué le falta a un correo (null si es válido). */
+function problemaEmail(valor) {
+    const e = String(valor || '').trim();
+    if (!e) return 'Ingresa tu correo.';
+    if (/\s/.test(e)) return 'El correo no puede tener espacios.';
+    const partes = e.split('@');
+    if (partes.length === 1) return 'Falta el @ (ejemplo: nombre@dominio.com).';
+    if (partes.length > 2) return 'El correo solo puede tener un @.';
+    const [usuario, dominio] = partes;
+    if (!usuario) return 'Falta el nombre antes del @.';
+    if (!dominio) return 'Falta el dominio después del @ (ejemplo: gmail.com).';
+    if (!dominio.includes('.')) return 'Al dominio le falta la extensión (.com, .pe…).';
+    if (!/\.[A-Za-z]{2,24}$/.test(dominio)) return 'La extensión del dominio no es válida.';
+    if (!RE.email.test(e) || e.length > 120) return 'El correo tiene caracteres no permitidos.';
+    return null;
+}
+
 function rucValido(ruc) {
     if (!RE.ruc.test(ruc)) return false;
     const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
@@ -147,6 +164,6 @@ function validarFecha(v) {
 }
 
 module.exports = {
-    ErrorHttp, RE, rucValido, problemaClave, limpiar, entero,
+    ErrorHttp, RE, rucValido, problemaEmail, problemaClave, limpiar, entero,
     validarCliente, validarUsuario, validarCaudal, validarFecha,
 };

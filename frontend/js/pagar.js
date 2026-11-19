@@ -9,7 +9,7 @@
 import { get, post } from './api.js';
 import { estado } from './estado.js';
 import { esc, soles, toast, abrirModal, conCarga, copiar } from './ui.js';
-import { erroresServidor, limpiarErrores } from './validacion.js';
+import { erroresServidor, limpiarErrores, problemaEmail } from './validacion.js';
 import { formularioTarjeta, formularioYape, abrirCulqi } from './pago-linea.js';
 
 const MARCA = {
@@ -250,6 +250,11 @@ export async function abrirPago({ cotizacion, tipo, alTerminar }) {
                     <span class="hint">Debe ser exactamente ${soles(cotizacion.monto)}.</span>
                     <span class="error" data-error-de="monto"></span>
                 </div>
+                <div class="field">
+                    <label for="pp-email"><i class="fa-regular fa-envelope"></i> Correo para avisarte <span class="muted">(opcional)</span></label>
+                    <input id="pp-email" name="email" type="email" class="input" maxlength="120" placeholder="tucorreo@gmail.com" data-validar="email-opcional" spellcheck="false" autocapitalize="off" inputmode="email">
+                    <span class="error" data-error-de="email"></span>
+                </div>
                 <div class="modal-pie" style="padding:0;border:0">
                     <button type="button" class="btn btn-ghost" data-volver><i class="fa-solid fa-arrow-left"></i> Volver</button>
                     <button type="submit" class="btn btn-arena"><i class="fa-solid fa-paper-plane"></i> Enviar constancia</button>
@@ -288,6 +293,9 @@ export async function abrirPago({ cotizacion, tipo, alTerminar }) {
             const monto = Number(form.monto.value.replace(',', '.'));
             if (Math.abs(monto - Number(cotizacion.monto)) > 0.009) errores.monto = `Debe ser exactamente ${soles(cotizacion.monto)}.`;
             if (billetera && !voucher) errores.voucher = 'Sube la captura de tu constancia.';
+            const email = form.email.value.trim().toLowerCase();
+            const pe = email ? problemaEmail(email) : null;
+            if (pe) errores.email = pe;
             if (Object.keys(errores).length) {
                 if (errores.voucher) form.querySelector('[data-error-de="voucher"]').textContent = errores.voucher;
                 erroresServidor(form, errores);
@@ -296,7 +304,7 @@ export async function abrirPago({ cotizacion, tipo, alTerminar }) {
             try {
                 const r = await conCarga(form.querySelector('[type=submit]'), () => post('/pagos/reportar', {
                     cliente_id: estado.clienteId, tipo, cuenta_id: cuenta.id, operacion: op,
-                    fecha_operacion: new Date(form.fecha_operacion.value).toISOString(), monto, voucher: voucher || undefined,
+                    fecha_operacion: new Date(form.fecha_operacion.value).toISOString(), monto, voucher: voucher || undefined, email: email || undefined,
                 }), 'Enviando…');
                 listo(r.pago);
                 alTerminar?.(r.pago);

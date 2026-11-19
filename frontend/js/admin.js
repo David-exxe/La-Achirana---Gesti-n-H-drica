@@ -43,6 +43,36 @@ async function cargarTab(nombre) {
     if (nombre === 'medios') await cargarCuentas();
     if (nombre === 'puntos') await cargarPuntos();
     if (nombre === 'auditoria') await cargarAuditoria();
+    if (nombre === 'integraciones') await cargarIntegraciones();
+}
+
+// ---------------- Integraciones ----------------
+const filaInt = (ok, texto, neutro = false) => `<li class="${neutro ? 'neutro' : ok ? 'ok' : 'mal'}"><i class="fa-solid ${neutro ? 'fa-circle-info' : ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i><span>${esc(texto)}</span></li>`;
+const chipInt = (el, ok, txt) => { el.textContent = txt; el.className = `chip ${ok ? 'ok' : 'nivel-naranja'}`; };
+
+async function cargarIntegraciones() {
+    await Promise.all([estadoCorreo(), diagnosticoCulqi()]);
+}
+
+async function estadoCorreo() {
+    const e = await get('/admin/correo/estado');
+    chipInt(document.getElementById('int-correo-estado'), e.ok, e.ok ? 'Activo' : e.configurado ? 'Revisar' : 'Desactivado');
+    document.getElementById('int-correo-lista').innerHTML = [
+        filaInt(e.configurado, e.configurado ? `Microservicio: ${e.url}` : 'Microservicio sin conectar'),
+        e.proveedor ? filaInt(e.proveedor !== 'consola', `Proveedor: ${e.proveedor}${e.proveedor === 'consola' ? ' (solo registra, no envía)' : ''}`) : '',
+        e.remitente ? filaInt(true, `Remitente: ${e.remitente}`) : '',
+        filaInt(e.destinatarios > 0, e.destinatarios ? `${e.destinatarios} correo(s) de la Junta` : 'Falta el correo de la Junta'),
+        e.problema ? filaInt(false, e.problema) : '',
+    ].join('');
+}
+
+async function diagnosticoCulqi() {
+    const d = await get('/admin/culqi/diagnostico');
+    chipInt(document.getElementById('int-culqi-estado'), d.listo, d.listo ? (d.modo === 'prueba' ? 'Prueba OK' : 'Producción OK') : d.activo ? 'Revisar' : 'Modo demo');
+    document.getElementById('int-culqi-lista').innerHTML = d.chequeos.map(c => filaInt(c.ok, c.detalle, c.id === 'rsa')).join('')
+        + (!d.activo ? filaInt(true, 'Sin llaves: se usa el cobro de demostración (no cobra).', true) : '');
+    document.getElementById('int-culqi-tarjetas').innerHTML = d.tarjetasPrueba.length
+        ? `<div class="tarjetas-prueba">${d.tarjetasPrueba.map(t => `<div><strong>${esc(t.marca)}</strong><span class="mono">${esc(t.numero)}</span><small>${esc(t.vence)} · CVV ${esc(t.cvv)}</small></div>`).join('')}</div>` : '';
 }
 
 // ---------------- Regantes ----------------
@@ -542,6 +572,17 @@ async function cargarAuditoria() {
 // ---------------- Eventos ----------------
 export function iniciarAdmin({ onClientesCambiados }) {
     alRecargarClientes = onClientesCambiados || (() => {});
+    document.getElementById('btn-culqi-diag').addEventListener('click', e => conCarga(e.currentTarget, diagnosticoCulqi, 'Probando…').catch(err => toast(err.message, 'error')));
+    document.getElementById('form-correo-prueba').addEventListener('submit', async e => {
+        e.preventDefault();
+        const f = e.currentTarget;
+        if (!validarFormulario(f)) return;
+        try {
+            const r = await conCarga(f.querySelector('[type=submit]'), () => post('/admin/correo/prueba', { email: f.email.value.trim() || undefined }), 'Enviando…');
+            toast(`Correo de prueba enviado a ${r.para}.`, 'ok');
+            estadoCorreo().catch(() => {});
+        } catch (err) { erroresServidor(f, err.campos); toast(err.message, 'error', 8000); }
+    });
     document.getElementById('admin-tabs').addEventListener('click', e => {
         const b = e.target.closest('[data-tab]');
         if (b) cargarTab(b.dataset.tab).catch(err => toast(err.message, 'error'));

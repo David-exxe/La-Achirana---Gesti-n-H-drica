@@ -1,10 +1,11 @@
 const { query, transaccion } = require('../Config/db');
-const { ErrorHttp, entero, limpiar } = require('../utils/validacion');
+const { ErrorHttp, entero, limpiar, problemaEmail } = require('../utils/validacion');
 const { clienteObjetivo } = require('../middleware/auth');
 const pagosSrv = require('../services/pagos.service');
 const { leerImagen, aDataUrl } = require('../utils/imagen');
 const auditoria = require('../services/auditoria.service');
 const culqi = require('../services/culqi.service');
+const correo = require('../services/correo.service');
 const config = require('../Config/env');
 const crypto = require('crypto');
 
@@ -68,6 +69,8 @@ async function reportar(req, res) {
     else if (fecha.getTime() > Date.now() + 10 * 60000) errores.fecha_operacion = 'La fecha no puede ser futura.';
     else if (fecha.getTime() < Date.now() - 15 * 86400000) errores.fecha_operacion = 'Solo pagos de los últimos 15 días.';
     if (!Number.isFinite(montoDeclarado) || montoDeclarado <= 0) errores.monto = 'Indica el monto que pagaste.';
+    let emailContacto = null;
+    try { emailContacto = emailOpcional(req.body?.email); } catch (e) { errores.email = e.campos.email; }
     if (Object.keys(errores).length) throw new ErrorHttp(400, 'Revisa los datos del pago.', errores);
 
     const { rows: cuentas } = await query('SELECT * FROM cuentas_cobro WHERE id = $1 AND activo', [cuentaId]);
@@ -89,8 +92,8 @@ async function reportar(req, res) {
         await transaccion(async db => {
             await db.query(
                 `UPDATE pagos SET estado = 'validacion', cuenta_id = $2, entidad = $3, operacion = $4, fecha_operacion = $5,
-                        monto_declarado = $6, actualizado_en = now() WHERE id = $1`,
-                [pago.id, cuenta.id, cuenta.entidad, operacion, fecha, montoDeclarado]
+                        monto_declarado = $6, email_contacto = $7, actualizado_en = now() WHERE id = $1`,
+                [pago.id, cuenta.id, cuenta.entidad, operacion, fecha, montoDeclarado, emailContacto]
             );
             if (voucher) {
                 await db.query(
@@ -109,6 +112,8 @@ async function reportar(req, res) {
         throw err;
     }
     await auditoria.registrar(req, 'reportar_pago', 'pagos', pago.id, { metodo: cuenta.metodo, entidad: cuenta.entidad, operacion, monto: c.monto });
+    const pc = await pagoYCliente(pago.id);
+    correo.avisos.reportado(pc.pago, pc.cliente);
     const { rows } = await query('SELECT * FROM pagos WHERE id = $1', [pago.id]);
     res.status(201).json({ pago: await formatear(rows[0]) });
 }
@@ -163,6 +168,9 @@ async function validar(req, res) {
     }
     await query('UPDATE pagos SET validado_por = $2, validado_en = now() WHERE id = $1', [id, req.sesion.id]);
     await auditoria.registrar(req, decision === 'aprobar' ? 'validar_pago' : 'rechazar_pago', 'pagos', id, { motivo: motivo || null, monto: pago.monto });
+    const pc = await pagoYCliente(id);
+    if (decision === 'aprobar' && pc.pago.estado === 'aprobado') correo.avisos.aprobado(pc.pago, pc.cliente);
+    else if (decision === 'rechazar') correo.avisos.rechazado(pc.pago, pc.cliente);
     const fin = await query('SELECT * FROM pagos WHERE id = $1', [id]);
     res.json({ pago: await formatear(fin.rows[0]) });
 }
@@ -173,7 +181,7 @@ async function enLinea(req, res) {
     res.json({ culqi: culqi.configuracionPublica(), demo: config.pagosDemo });
 }
 
-const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,}$/i;
+const EMAIL_RE = correo.EMAIL_RE;
 
 /** Cobra con el token que generó el checkout de Culqi (tarjeta o Yape). */
 async function cargoCulqi(req, res) {
@@ -204,6 +212,8 @@ async function cargoCulqi(req, res) {
         [pago.id, cargo.medio, entidad.slice(0, 60), cargo.id.slice(0, 60)]);
     const aprobado = await pagosSrv.aprobar(pago.id, { statusDetail: cargo.id, metodoDetalle: `Culqi ${entidad}` });
     await auditoria.registrar(req, 'pago_culqi', 'pagos', pago.id, { monto: pago.monto, cargo: cargo.id, medio: cargo.medio });
+    const pc = await pagoYCliente(pago.id);
+    correo.avisos.aprobado(pc.pago, pc.cliente, email);
     res.status(201).json({ pago: await formatear(aprobado), mensaje: cargo.mensaje });
 }
 
@@ -217,6 +227,7 @@ async function cargoDemo(req, res) {
     const tipo = tipoValido(req.body?.tipo);
     const medio = String(req.body?.medio || '');
     if (!['tarjeta', 'yape'].includes(medio)) throw new ErrorHttp(400, 'Medio no válido.');
+    const emailDemo = emailOpcional(req.body?.email);
     let entidad;
     if (medio === 'tarjeta') {
         const marca = String(req.body?.marca || '');
@@ -233,7 +244,31 @@ async function cargoDemo(req, res) {
     await query('UPDATE pagos SET entidad = $2, operacion = $3, fecha_operacion = now(), monto_declarado = monto WHERE id = $1', [pago.id, entidad, operacion]);
     const aprobado = await pagosSrv.aprobar(pago.id, { statusDetail: operacion, metodoDetalle: entidad });
     await auditoria.registrar(req, 'pago_demo', 'pagos', pago.id, { monto: pago.monto, medio });
+    const pc = await pagoYCliente(pago.id);
+    correo.avisos.aprobado(pc.pago, pc.cliente, emailDemo);
     res.status(201).json({ pago: await formatear(aprobado), demo: true });
+}
+
+// ------------------------------------------------------------------ Notificaciones por correo (admin)
+async function estadoCorreo(req, res) {
+    res.json(await correo.estado());
+}
+
+async function probarCorreo(req, res) {
+    const para = emailOpcional(req.body?.email) || correo.destinosJunta()[0];
+    if (!para) throw new ErrorHttp(400, 'Indica a qué correo enviar la prueba.', { email: 'Usa el formato nombre@dominio.com.' });
+    try {
+        const r = await correo.enviarAhora('prueba', [para], { usuario: req.sesion.nombre, fecha: new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' }) });
+        await auditoria.registrar(req, 'correo_prueba', 'usuarios', req.sesion.id, { para });
+        res.json({ ok: true, para, proveedor: r.proveedor, id: r.id });
+    } catch (err) {
+        throw new ErrorHttp(err.estado && err.estado < 500 ? 400 : 502, `No se pudo enviar: ${err.message}`);
+    }
+}
+
+/** Verifica las llaves de Culqi (prueba o producción) contra la API. */
+async function diagnosticoCulqi(req, res) {
+    res.json(await culqi.diagnostico());
 }
 
 // ------------------------------------------------------------------ Cuentas de cobro (admin)
@@ -316,7 +351,25 @@ async function pagoManual(req, res) {
     if (referencia) await query('UPDATE pagos SET operacion = $2, entidad = $3 WHERE id = $1', [pago.id, referencia.toUpperCase(), `caja-${metodo}`]);
     const aprobado = await pagosSrv.aprobar(pago.id, { statusDetail: referencia || null, metodoDetalle: metodo });
     await auditoria.registrar(req, 'pago_manual', 'pagos', pago.id, { metodo, referencia, monto: pago.monto });
+    const pc = await pagoYCliente(pago.id);
+    correo.avisos.aprobado(pc.pago, pc.cliente);
     res.status(201).json({ pago: await formatear(aprobado) });
+}
+
+/** Pago + cliente para los avisos por correo. */
+async function pagoYCliente(id) {
+    const { rows } = await query('SELECT p.*, c.nombre AS c_nombre, c.documento AS c_doc FROM pagos p JOIN clientes c ON c.id = p.cliente_id WHERE p.id = $1', [id]);
+    const r = rows[0];
+    return r ? { pago: r, cliente: { nombre: r.c_nombre, documento: r.c_doc } } : null;
+}
+
+/** Correo opcional del regante para su constancia (valida formato con @ y dominio). */
+function emailOpcional(valor) {
+    const e = String(valor || '').trim().toLowerCase();
+    if (!e) return null;
+    const problema = problemaEmail(e);
+    if (problema) throw new ErrorHttp(400, problema, { email: problema });
+    return e;
 }
 
 async function formatear(p) {
@@ -419,5 +472,5 @@ async function cambiarTarifa(req, res) {
 
 module.exports = {
     cotizacion, medios, reportar, voucher, porValidar, validar, pagoManual, listar, comprobante,
-    recaudacion, obtenerTarifa, cambiarTarifa, enLinea, cargoCulqi, cargoDemo, listarCuentas, crearCuenta, actualizarCuenta, eliminarCuenta,
+    recaudacion, obtenerTarifa, cambiarTarifa, enLinea, cargoCulqi, cargoDemo, estadoCorreo, probarCorreo, diagnosticoCulqi, listarCuentas, crearCuenta, actualizarCuenta, eliminarCuenta,
 };

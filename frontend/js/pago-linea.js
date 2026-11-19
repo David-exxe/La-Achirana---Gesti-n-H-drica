@@ -5,6 +5,7 @@
 //   - Sin llaves (modo demostración): formulario realista que NO cobra y
 //     solo acepta tarjetas de prueba. Al servidor van marca y últimos 4.
 // =====================================================================
+import { problemaEmail } from './validacion.js';
 import { post } from './api.js';
 import { estado } from './estado.js';
 import { esc, soles, toast } from './ui.js';
@@ -167,15 +168,16 @@ export function formularioTarjeta(cuerpo, { cotizacion, tipo, cliente, alAprobar
         const fin = new Date(2000 + (aa || 0), mm || 0, 1);
         if (!(mm >= 1 && mm <= 12) || !aa || fin <= new Date()) fallo('vence', 'Fecha vencida o no válida.');
         if (f.cvv.value.length !== (marca === 'Amex' ? 4 : 3)) fallo('cvv', marca === 'Amex' ? '4 dígitos.' : '3 dígitos.');
-        if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(f.email.value.trim())) fallo('email', 'Correo no válido.');
+        { const pe = problemaEmail(f.email.value.trim()); if (pe) fallo('email', pe); }
         if (!ok) return;
         const ultimos4 = n.slice(-4);
+        const email = f.email.value.trim().toLowerCase();
         // Se descartan los datos sensibles antes de seguir
         f.numero.value = ''; f.cvv.value = '';
         pantallaProcesando(cuerpo, 'Procesando el pago con tu banco…');
         try {
             await espera(1400);
-            const r = await post('/pagos/demo/cargo', { cliente_id: estado.clienteId, tipo, medio: 'tarjeta', marca, ultimos4 });
+            const r = await post('/pagos/demo/cargo', { cliente_id: estado.clienteId, tipo, medio: 'tarjeta', marca, ultimos4, email });
             alAprobar(r.pago, { demo: true });
         } catch (er) {
             toast(er.message, 'error', 7000);
@@ -214,6 +216,11 @@ export function formularioYape(cuerpo, { cotizacion, tipo, alAprobar, alVolver }
                     <span class="error" data-error-de="codigo"></span>
                     <button type="button" class="link-btn small" data-generar><i class="fa-solid fa-wand-magic-sparkles"></i> Generar un código de prueba</button>
                 </div>
+                <div class="field">
+                    <label for="yp-email">Correo para la constancia <span class="muted">(opcional)</span></label>
+                    <input id="yp-email" class="input" type="email" maxlength="120" placeholder="tucorreo@gmail.com" spellcheck="false" autocapitalize="off">
+                    <span class="error" data-error-de="email"></span>
+                </div>
                 <div class="modal-pie" style="padding:0;border:0">
                     <button type="button" class="btn btn-ghost" data-volver><i class="fa-solid fa-arrow-left"></i> Otro medio</button>
                     <button type="submit" class="btn btn-yape"><i class="fa-solid fa-bolt"></i> Yapear ${soles(cotizacion.monto)}</button>
@@ -245,12 +252,15 @@ export function formularioYape(cuerpo, { cotizacion, tipo, alAprobar, alVolver }
         const codigo = cajas.map(c => c.value).join('');
         cuerpo.querySelector('[data-error-de="celular"]').textContent = /^9\d{8}$/.test(cel.value) ? '' : '9 dígitos, empieza con 9.';
         cuerpo.querySelector('[data-error-de="codigo"]').textContent = /^\d{6}$/.test(codigo) ? '' : 'Escribe los 6 dígitos.';
-        if (!/^9\d{8}$/.test(cel.value) || !/^\d{6}$/.test(codigo)) return;
+        const email = $('#yp-email').value.trim().toLowerCase();
+        const pe = email ? problemaEmail(email) : null;
+        cuerpo.querySelector('[data-error-de="email"]').textContent = pe || '';
+        if (!/^9\d{8}$/.test(cel.value) || !/^\d{6}$/.test(codigo) || pe) return;
         const celular = cel.value;
         pantallaProcesando(cuerpo, 'Confirmando con Yape…');
         try {
             await espera(1400);
-            const r = await post('/pagos/demo/cargo', { cliente_id: estado.clienteId, tipo, medio: 'yape', celular });
+            const r = await post('/pagos/demo/cargo', { cliente_id: estado.clienteId, tipo, medio: 'yape', celular, email: email || undefined });
             alAprobar(r.pago, { demo: true });
         } catch (er) {
             toast(er.message, 'error', 7000);

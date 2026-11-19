@@ -1,4 +1,4 @@
-# La Achirana · Gestión hídrica (v3.1)
+# La Achirana · Gestión hídrica (v3.2)
 
 Sistema web para la Junta de Usuarios La Achirana. Incluye consumo de agua por regante, cobro del canon hídrico con tarjeta y Yape en línea (Culqi), y con Yape, Plin y transferencias bancarias (BCP, Interbank, BBVA…), comprobantes, tablero gerencial con costos, ingresos, capacidad del canal y cupos por hectárea, y alertas de lluvia en la sierra con una simulación de cuándo llega el agua a Ica.
 
@@ -31,6 +31,8 @@ Backend/
   routes/index.js           todas las rutas, con su nivel de acceso
 frontend/
   index.html, css/styles.css
+  vendor/                   Leaflet, Chart.js y Font Awesome locales (no dependen de CDN)
+servicio-correo/            microservicio de correo (segundo servicio en Render, sin dependencias)
   js/  pago-linea.js (tarjeta/Yape Culqi y demo) · app.js (entrada) · api.js · validacion.js · ui.js · inicio.js · clima.js · pagos.js · analisis.js · admin.js · comprobante.js · turnos.js · gerencia.js · pagar.js · voucher.js
 ```
 
@@ -87,6 +89,36 @@ El regante también puede pagar **con tarjeta** (Visa, Mastercard, American Expr
 - Al servidor solo llegan la marca y los últimos 4 dígitos, nunca el número completo ni el CVV.
 - Se apaga solo en producción (`NODE_ENV=production`) o con `PAGOS_DEMO=false`.
 - Los pagos de demostración quedan como aprobados con la entidad "Demo …". Úsalos solo en la base de pruebas.
+
+## 3a-bis. Validar Culqi en modo prueba (developer)
+
+1. Crea tu cuenta gratis en https://integ-panel.culqi.com y copia `pk_test_…` y `sk_test_…`.
+2. En Render → servicio `achirana` → **Environment**, agrega `CULQI_PUBLIC_KEY`, `CULQI_SECRET_KEY` y pon `PAGOS_DEMO=false`.
+3. Entra como admin → **Panel → Integraciones**. La tarjeta *Culqi* revisa las llaves (prefijo, mismo entorno) y hace una consulta de solo lectura a Culqi. Si todo está bien muestra **Prueba OK**.
+4. Paga como regante con la tarjeta `4111 1111 1111 1111`, fecha futura, CVV `123`, o con Yape de prueba. No se cobra dinero real.
+
+Lo que el servidor ya maneja: tarjeta rechazada (muestra el mensaje del banco), 3D Secure (no cobra y sugiere otro medio), Yape (`ype_…`) y doble cobro (bloqueado). Se probó con un simulador de la API de Culqi.
+
+## 3a-ter. Avisos por correo de cada pago
+
+Cada pago dispara un correo. Lo envía el microservicio `servicio-correo/`, que corre como **segundo servicio en Render** y usa **Brevo** (300 correos/día gratis).
+
+| Evento | Junta | Regante* |
+|---|---|---|
+| Constancia de Yape/Plin/banco enviada | Pago por validar | Constancia recibida |
+| Pago aprobado (validación, Culqi, demo o caja) | Pago aprobado | Pago aprobado + n.° de comprobante |
+| Pago rechazado | — | Motivo del rechazo |
+
+\* Solo si el regante escribe su correo (campo opcional al pagar).
+
+**Activarlo (una vez):**
+1. Crea una cuenta en https://www.brevo.com → **Senders, Domains & Dedicated IPs → Senders** → agrega y verifica el correo que enviará (ej. `pagos.laachirana@gmail.com`).
+2. **SMTP & API → API Keys** → genera una llave (`xkeysib-…`).
+3. Sube el código y sincroniza el Blueprint: Render crea `achirana-correo` y te pide `BREVO_API_KEY` y `CORREO_REMITENTE` (el correo verificado).
+4. Copia la URL de `achirana-correo` (ej. `https://achirana-correo.onrender.com`) y pégala en el servicio `achirana` como `CORREO_SERVICIO_URL`. En `NOTIFICAR_PAGOS_A` pon el correo de la Junta.
+5. **Panel → Integraciones → Enviar prueba.** Si llega, ya está.
+
+`CORREO_CLAVE` se genera y se copia sola entre los dos servicios. Si un correo falla, el pago no se afecta: el aviso se reintenta una vez.
 
 ## 3b. Rol Gerente y Tablero gerencial
 
@@ -148,7 +180,10 @@ Los turnos adicionales aparecen como *Adicional*, o como *Almacenamiento* si el 
 - **Caudal modelado del río Ica:** GloFAS (Copernicus), también vía Open-Meteo.
 - **Alerta para regantes y personal:** una franja visible en todas las pantallas, más un aviso al ingresar.
 - **Simulación de llegada:** el rango entre el tiempo de concentración de Kirpich y la distancia dividida entre la velocidad de avenida (1.5–3.5 m/s). Se aplica desde la hora central de la lluvia del día.
-- **Mapa:** capa satelital NASA GIBS (IMERG = lluvia, MODIS = nubes) y pronóstico animado de Windy (modelo ECMWF).
+- **Mapa · Cuenca:** puntos de monitoreo sobre mapa o **satélite** (Esri).
+- **Mapa · Satélite NASA:** lluvia medida por satélite cada 30 min (GPM IMERG, capa `IMERG_Precipitation_Rate_30min`, llega con ~7 h de retraso) animada en las últimas 24 h, más la foto de nubes del día anterior (MODIS Terra, Aqua o VIIRS).
+- **Mapa · Windy:** pronóstico animado de lluvia (modelo ECMWF). Se carga solo al abrir la pestaña.
+- **Mapa · Lluvia en movimiento:** malla de 72 puntos sobre la cuenca con lluvia **hora por hora** (Open-Meteo, ayer + 2 días). Botón ▶ para animarla, barra de tiempo, velocidad 1×/2×/4×, pico en mm/h y gráfico sierra vs. valle. Ruta: `GET /api/clima/lluvia`.
 - **Datos editables:** distancias, altitudes y puntos se cambian en **Panel → Puntos de monitoreo**. Umbrales y velocidades se cambian en `.env`.
 - **Modo presentación:** `CLIMA_SIMULACION=true` muestra una tormenta simulada, marcada como tal en la interfaz.
 
@@ -200,6 +235,13 @@ Para la vista del regante:
 - `clientes.almacena` y `capacidad_reservorio_m3`: indican qué fundos almacenan y cuánto les cabe.
 - `historial_caudal`: nuevas columnas `volumen_m3` (lo que se cobra), `horas` y `turno_id`.
 
+## 5b. Ingreso con DNI, RUC o correo
+
+- Tres pestañas: **DNI** (parcelero), **RUC** (fundo) y **Correo** (personal de la Junta).
+- DNI y RUC solo aceptan números: las letras y espacios no se escriben, ni siquiera al pegar. Un contador muestra `5/8` o `9/11` y aparece ✓ al completar.
+- El RUC se valida con su dígito verificador.
+- El correo dice qué le falta: el @, el dominio, la extensión (.com, .pe) o que tiene espacios. El servidor repite todas las validaciones.
+
 ## 6. Seguridad aplicada
 
 - **Autenticación:** JWT firmado (HS256) y roles admin / gerente / operador / cliente. Antes todas las rutas `/api/admin/*` estaban abiertas.
@@ -224,7 +266,7 @@ Para la vista del regante:
 ```bash
 git init
 git add .
-git commit -m "La Achirana v3.1"
+git commit -m "La Achirana v3.2"
 git branch -M main
 git remote add origin https://github.com/TU_USUARIO/achirana.git
 git push -u origin main
@@ -236,7 +278,7 @@ git push -u origin main
    - `ADMIN_INICIAL_EMAIL` y `ADMIN_INICIAL_PASS`: el primer administrador.
    - `GERENTE_INICIAL_PASS`: la clave del gerente (`gerente@laachirana.pe`).
 3. Espera a que termine. La web queda en `https://achirana.onrender.com` (o el nombre que Render asigne). Las tablas se crean solas al primer arranque.
-4. Revisa que todo responde en `https://…onrender.com/api/salud`. Debe mostrar `{"ok":true,"version":"3.1.0"}`.
+4. Revisa que todo responde en `https://…onrender.com/api/salud`. Debe mostrar `{"ok":true,"version":"3.2.0"}`.
 
 Si prefieres crear todo a mano (sin Blueprint):
 1. Crea una base **PostgreSQL**.

@@ -1,6 +1,6 @@
 {
   "name": "achirana-gestion-hidrica",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Junta de Usuarios La Achirana - gestión hídrica, cobro de canon y alertas de lluvia en la sierra",
   "main": "Backend/app.js",
   "private": true,

@@ -33,3 +33,34 @@ services:
         value: "true"     # cobros simulados para presentar; pon "false" al cobrar de verdad
       - key: SEMBRAR_DEMO
         value: "true"     # carga 40 regantes ficticios si la base está vacía; pon "false" con datos reales
+      # ---- Avisos por correo (microservicio achirana-correo) ----
+      - key: CORREO_CLAVE
+        fromService:
+          type: web
+          name: achirana-correo
+          envVarKey: CORREO_CLAVE
+      - key: CORREO_SERVICIO_URL
+        sync: false       # https://achirana-correo.onrender.com (la URL que Render le dé)
+      - key: NOTIFICAR_PAGOS_A
+        sync: false       # correo(s) de la Junta que reciben cada pago, separados por coma
+
+  # Microservicio de correo: recibe los avisos y los envía con Brevo (gratis 300/día)
+  - type: web
+    name: achirana-correo
+    runtime: node
+    plan: free
+    rootDir: servicio-correo
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /salud
+    envVars:
+      - key: CORREO_CLAVE
+        generateValue: true   # clave compartida con el servicio principal
+      - key: CORREO_PROVEEDOR
+        value: brevo          # brevo | resend | consola
+      - key: BREVO_API_KEY
+        sync: false           # app.brevo.com → SMTP & API → API Keys
+      - key: CORREO_REMITENTE
+        sync: false           # correo verificado en Brevo (Senders)
+      - key: CORREO_NOMBRE
+        value: Junta de Usuarios La Achirana

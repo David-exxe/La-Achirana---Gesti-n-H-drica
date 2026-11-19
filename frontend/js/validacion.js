@@ -16,6 +16,22 @@ export function rucValido(ruc) {
     return dv === Number(ruc[10]);
 }
 
+/** Explica qué le falta a un correo (null si es válido). Igual que en el servidor. */
+export function problemaEmail(e) {
+    if (!e) return 'Ingresa tu correo.';
+    if (/\s/.test(e)) return 'El correo no lleva espacios.';
+    const partes = e.split('@');
+    if (partes.length === 1) return 'Falta el @ (nombre@dominio.com).';
+    if (partes.length > 2) return 'Solo puede haber un @.';
+    const [usuario, dominio] = partes;
+    if (!usuario) return 'Falta el nombre antes del @.';
+    if (!dominio) return 'Falta el dominio después del @ (ej. gmail.com).';
+    if (!dominio.includes('.')) return 'Falta la extensión del dominio (.com, .pe…).';
+    if (!/\.[A-Za-z]{2,24}$/.test(dominio)) return 'La extensión del dominio no es válida.';
+    if (!/^[^\s@<>()[\]\\,;:"]{1,64}@[A-Za-z0-9.-]{1,180}\.[A-Za-z]{2,24}$/.test(e) || e.length > 120) return 'El correo tiene caracteres no permitidos.';
+    return null;
+}
+
 const decimalesMax = (v, n) => !String(v).includes('.') || String(v).split('.')[1].length <= n;
 const NOMBRE = /^[\p{L}\p{N} .,'&()\-/]+$/u;
 const TEXTO = /^[\p{L}\p{N} .,'&()\-/#°ºª:;+]+$/u;
@@ -23,11 +39,11 @@ const TEXTO = /^[\p{L}\p{N} .,'&()\-/#°ºª:;+]+$/u;
 /** Cada regla devuelve null si es válido, o el mensaje de error. */
 const REGLAS = {
     requerido: v => (v ? null : 'Este campo es obligatorio.'),
-    email: v => (!v ? 'Ingresa tu correo.' : /^[^\s@<>()[\]\\,;:"]{1,64}@[A-Za-z0-9.-]{1,180}\.[A-Za-z]{2,24}$/.test(v) ? null : 'Correo no válido (ej. nombre@dominio.com).'),
-    dni: v => (/^\d{8}$/.test(v) ? null : 'El DNI tiene exactamente 8 dígitos.'),
+    email: v => problemaEmail(v),
+    'email-opcional': v => (v ? problemaEmail(v) : null),
+    dni: v => (!v ? 'Ingresa tu DNI.' : /\D/.test(v) ? 'El DNI solo lleva números.' : v.length !== 8 ? `El DNI tiene 8 dígitos (van ${v.length}).` : null),
     ruc: v => (!/^\d{11}$/.test(v) ? 'El RUC tiene exactamente 11 dígitos.' : !/^(10|15|16|17|20)/.test(v) ? 'El RUC empieza con 10, 15, 16, 17 o 20.' : rucValido(v) ? null : 'El dígito verificador no coincide. Revisa el número.'),
-    // En el login solo se valida el formato (el dígito verificador lo revisa el registro)
-    'ruc-login': v => (/^(10|15|16|17|20)\d{9}$/.test(v) ? null : 'El RUC tiene 11 dígitos y empieza con 10, 15, 16, 17 o 20.'),
+    'ruc-login': v => (!v ? 'Ingresa tu RUC.' : /\D/.test(v) ? 'El RUC solo lleva números.' : v.length !== 11 ? `El RUC tiene 11 dígitos (van ${v.length}).` : !/^(10|15|16|17|20)/.test(v) ? 'El RUC empieza con 10, 15, 16, 17 o 20.' : rucValido(v) ? null : 'RUC no válido: revisa el último dígito.'),
     'pin-opcional': v => (!v ? null : !/^\d{6}$/.test(v) ? 'El código tiene 6 dígitos.' : null),
     nombre: v => (v.length < 3 ? 'Mínimo 3 caracteres.' : v.length > 100 ? 'Máximo 100 caracteres.' : NOMBRE.test(v) ? null : 'Usa solo letras, números y . , - & ( ) /'),
     'nombre-persona': v => (v.length < 2 ? 'Mínimo 2 caracteres.' : /^[\p{L} .'-]+$/u.test(v) ? null : 'Solo letras y espacios.'),

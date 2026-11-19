@@ -1,0 +1,13 @@
+{
+  "name": "achirana-servicio-correo",
+  "version": "1.0.0",
+  "description": "Microservicio de correo de La Achirana: recibe avisos del sistema y los envía por Brevo o Resend",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node prueba.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {}
+}

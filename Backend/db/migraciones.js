@@ -336,6 +336,10 @@ const migraciones = [
             SELECT setval('seq_factura', GREATEST(1, COALESCE((SELECT MAX(NULLIF(regexp_replace(numero, '^F001-0*', ''), '')::INT) FROM pagos WHERE numero ~ '^F001-\\d+$'), 0) + 1), false);
         `,
     },
+    {
+        nombre: '2026_11_pagos_email_contacto',
+        sql: `ALTER TABLE pagos ADD COLUMN IF NOT EXISTS email_contacto VARCHAR(120);`,
+    },
 ];
 
 // Puntos por defecto: cuenca alta del río Ica (Huancavelica) y bocatoma La Achirana.

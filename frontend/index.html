@@ -10,8 +10,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
     <link rel="stylesheet" href="css/styles.css">
 
     <!-- El tema se aplica antes de pintar para evitar parpadeo -->
@@ -34,7 +34,7 @@
 
         <div class="login-titular">
             <h1>Del agua que nace en Huancavelica al surco de tu chacra.</h1>
-            <p>Consulta tu consumo, paga tu canon hídrico y entérate a tiempo cuando llueve en la sierra y el río empieza a bajar.</p>
+            <p>Consumo, pagos y alertas de lluvia en un solo lugar.</p>
         </div>
 
         <div class="login-pie">
@@ -58,49 +58,52 @@
 
     <section class="login-form-lado">
         <div class="login-card">
-            <div>
+            <div class="login-cabeza">
+                <span class="login-chip"><i class="fa-solid fa-shield-halved"></i> Acceso seguro</span>
                 <h2>Ingresar</h2>
-                <p class="muted">Elige cómo vas a entrar.</p>
             </div>
 
-            <div class="segmented" role="group" aria-label="Tipo de acceso">
-                <button type="button" data-modo="cliente" aria-pressed="true"><i class="fa-solid fa-seedling"></i> Soy regante</button>
-                <button type="button" data-modo="admin" aria-pressed="false"><i class="fa-solid fa-user-shield"></i> Personal de la Junta</button>
+            <div class="segmented seg-login" role="tablist" aria-label="Cómo ingresar">
+                <button type="button" role="tab" data-modo="DNI" aria-pressed="true"><i class="fa-solid fa-id-card"></i><span>DNI</span><small>Parcelero</small></button>
+                <button type="button" role="tab" data-modo="RUC" aria-pressed="false"><i class="fa-solid fa-building"></i><span>RUC</span><small>Fundo</small></button>
+                <button type="button" role="tab" data-modo="correo" aria-pressed="false"><i class="fa-solid fa-at"></i><span>Correo</span><small>Junta</small></button>
             </div>
 
-            <!-- Regante -->
+            <!-- Regante (DNI o RUC) -->
             <form id="form-login-cliente" class="form-grid" novalidate>
+                <input type="hidden" id="lc-tipo" name="tipoDoc" value="DNI">
                 <div class="field">
-                    <label for="lc-tipo">Documento</label>
-                    <select id="lc-tipo" name="tipoDoc" class="select">
-                        <option value="DNI">DNI (parcelero)</option>
-                        <option value="RUC">RUC (fundo o empresa)</option>
-                    </select>
-                </div>
-                <div class="field">
-                    <label for="lc-doc">Número de DNI</label>
-                    <input id="lc-doc" name="documento" class="input mono" inputmode="numeric" autocomplete="username"
-                           data-validar="dni" maxlength="8" placeholder="8 dígitos" required>
+                    <div class="label-fila"><label for="lc-doc" id="lc-doc-label">Número de DNI</label><span class="contador" id="lc-contador" aria-live="polite">0/8</span></div>
+                    <div class="input-icono">
+                        <i class="fa-solid fa-hashtag"></i>
+                        <input id="lc-doc" name="documento" class="input mono input-doc" inputmode="numeric" pattern="[0-9]*" autocomplete="username"
+                               data-validar="dni" maxlength="8" placeholder="00000000" required>
+                        <i class="fa-solid fa-circle-check marca-ok" aria-hidden="true"></i>
+                    </div>
                     <span class="error" data-error-de="documento"></span>
                 </div>
                 <div class="field">
-                    <label for="lc-pin">Código de acceso <span class="muted">(si la Junta te asignó uno)</span></label>
+                    <div class="label-fila"><label for="lc-pin">Código de acceso</label><span class="contador muted">opcional</span></div>
                     <div class="input-wrap">
-                        <input id="lc-pin" name="pin" type="password" class="input mono" inputmode="numeric" autocomplete="current-password"
+                        <input id="lc-pin" name="pin" type="password" class="input mono" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password"
                                data-validar="pin-opcional" maxlength="6" placeholder="6 dígitos">
                         <button type="button" class="icon-btn" data-ver-clave="lc-pin" aria-label="Mostrar código"><i class="fa-regular fa-eye"></i></button>
                     </div>
                     <span class="error" data-error-de="pin"></span>
                 </div>
-                <button type="submit" class="btn btn-primary btn-block"><i class="fa-solid fa-droplet"></i> Ver mi consumo</button>
+                <button type="submit" class="btn btn-primary btn-block btn-lg"><i class="fa-solid fa-droplet"></i> Ver mi consumo</button>
             </form>
 
-            <!-- Personal -->
+            <!-- Personal de la Junta (correo) -->
             <form id="form-login-admin" class="form-grid hidden" novalidate>
                 <div class="field">
-                    <label for="la-email">Correo</label>
-                    <input id="la-email" name="email" type="email" class="input" autocomplete="username"
-                           data-validar="email" maxlength="100" placeholder="nombre@dominio.com" required>
+                    <label for="la-email">Correo institucional</label>
+                    <div class="input-icono">
+                        <i class="fa-solid fa-at"></i>
+                        <input id="la-email" name="email" type="email" class="input" autocomplete="username" inputmode="email"
+                               data-validar="email" maxlength="120" placeholder="nombre@dominio.com" required spellcheck="false" autocapitalize="off">
+                        <i class="fa-solid fa-circle-check marca-ok" aria-hidden="true"></i>
+                    </div>
                     <span class="error" data-error-de="email"></span>
                 </div>
                 <div class="field">
@@ -112,10 +115,13 @@
                     </div>
                     <span class="error" data-error-de="pass"></span>
                 </div>
-                <button type="submit" class="btn btn-primary btn-block"><i class="fa-solid fa-right-to-bracket"></i> Ingresar al panel</button>
+                <button type="submit" class="btn btn-primary btn-block btn-lg"><i class="fa-solid fa-right-to-bracket"></i> Ingresar al panel</button>
             </form>
 
-            <p class="small muted"><i class="fa-solid fa-lock"></i> Conexión protegida. Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.</p>
+            <div class="login-sellos">
+                <span><i class="fa-solid fa-lock"></i> Cifrado</span>
+                <span><i class="fa-solid fa-user-lock"></i> Bloqueo tras 5 intentos</span>
+            </div>
         </div>
     </section>
     <button type="button" class="icon-btn tema-flotante" data-accion="tema" aria-label="Cambiar tema claro/oscuro"><i class="fa-solid fa-circle-half-stroke"></i></button>
@@ -446,7 +452,7 @@
                 <div class="vista-cabecera">
                     <div>
                         <h1>Lluvias en la sierra</h1>
-                        <p>Pronóstico de lluvia en las cabeceras del río Ica y una estimación de cuándo llegaría esa agua a la bocatoma La Achirana.</p>
+                        <p>Cabeceras del río Ica → bocatoma La Achirana.</p>
                     </div>
                     <div class="fila-flex">
                         <span class="small muted" id="clima-actualizado"></span>
@@ -468,46 +474,101 @@
                     <div class="llegada" id="llegada"></div>
                 </div>
 
-                <div class="panel">
+                <div class="panel panel-mapa">
                     <div class="panel-cab">
-                        <h2>Mapa de lluvias</h2>
-                        <div class="segmented mapa-tabs" role="tablist">
-                            <button type="button" data-mapa="nasa" aria-pressed="true">Satélite NASA</button>
-                            <button type="button" data-mapa="windy" aria-pressed="false">Pronóstico animado</button>
+                        <h2><i class="fa-solid fa-map-location-dot icono-titulo"></i> Mapa</h2>
+                        <div class="segmented mapa-tabs" role="tablist" aria-label="Vista del mapa">
+                            <button type="button" role="tab" data-mapa="cuenca" aria-pressed="true"><i class="fa-solid fa-location-dot"></i> Cuenca</button>
+                            <button type="button" role="tab" data-mapa="lluvia" aria-pressed="false"><i class="fa-solid fa-cloud-showers-heavy"></i> Lluvia en movimiento</button>
+                            <button type="button" role="tab" data-mapa="nasa" aria-pressed="false"><i class="fa-solid fa-satellite"></i> Satélite NASA</button>
+                            <button type="button" role="tab" data-mapa="windy" aria-pressed="false"><i class="fa-solid fa-wind"></i> Windy</button>
                         </div>
                     </div>
-                    <div class="mapa" id="mapa-nasa">
-                        <div id="mapa-leaflet" style="height:100%"></div>
-                        <div class="mapa-controles">
-                            <label class="check"><input type="checkbox" id="capa-imerg" checked> Lluvia satelital (IMERG)</label>
-                            <label class="check"><input type="checkbox" id="capa-nubes"> Nubes, imagen real (MODIS)</label>
-                            <div class="field">
-                                <label class="label" for="capa-fecha">Fecha de la imagen</label>
-                                <input type="date" id="capa-fecha" class="input" style="padding:6px 8px;font-size:13px">
+
+                    <!-- Vista 1: cuenca y puntos -->
+                    <div class="mapa" id="mapa-cuenca">
+                        <div id="mapa-leaflet" class="mapa-lienzo"></div>
+                        <div class="mapa-barra arriba-izq" role="group" aria-label="Fondo del mapa">
+                            <button type="button" class="pildora" data-fondo="mapa" aria-pressed="true"><i class="fa-solid fa-map"></i> Mapa</button>
+                            <button type="button" class="pildora" data-fondo="satelite" aria-pressed="false"><i class="fa-solid fa-satellite"></i> Satélite</button>
+                        </div>
+                        <div class="mapa-leyenda abajo-izq">
+                            <span><i class="punto" style="background:var(--n-verde)"></i>Sierra</span>
+                            <span><i class="punto cuadrado" style="background:var(--arena)"></i>Bocatoma</span>
+                            <span><i class="punto" style="background:var(--agua)"></i>Valle</span>
+                        </div>
+                    </div>
+
+                    <!-- Vista 2: lluvia animada -->
+                    <div class="hidden" id="mapa-lluvia-vista">
+                        <div class="kpis-lluvia" id="lluvia-kpis"></div>
+                        <div class="mapa" id="mapa-lluvia-caja">
+                            <div id="mapa-lluvia" class="mapa-lienzo"></div>
+                            <div class="mapa-reloj arriba-izq" id="lluvia-reloj" aria-live="off">—</div>
+                            <div class="mapa-leyenda escala abajo-izq" id="lluvia-escala"></div>
+                            <div class="mapa-cargando hidden" id="lluvia-cargando"><i class="fa-solid fa-spinner spin"></i></div>
+                        </div>
+                        <div class="reproductor">
+                            <button type="button" class="btn btn-primary btn-redondo" id="lluvia-play" aria-label="Reproducir"><i class="fa-solid fa-play"></i></button>
+                            <input type="range" id="lluvia-slider" min="0" max="71" value="0" aria-label="Hora del pronóstico">
+                            <button type="button" class="pildora" id="lluvia-ahora"><i class="fa-solid fa-crosshairs"></i> Ahora</button>
+                            <div class="segmented velocidad" role="group" aria-label="Velocidad">
+                                <button type="button" data-vel="900" aria-pressed="false">1×</button>
+                                <button type="button" data-vel="450" aria-pressed="true">2×</button>
+                                <button type="button" data-vel="200" aria-pressed="false">4×</button>
                             </div>
-                            <span class="small muted" id="capa-estado">Fuente: NASA GIBS / Worldview</span>
                         </div>
+                        <div class="grafico-lluvia"><canvas id="graf-lluvia"></canvas></div>
+                        <div class="fuente-dato" id="lluvia-fuente"></div>
                     </div>
-                    <div class="mapa hidden" id="mapa-windy"></div>
+
+                    <!-- Vista 3: satélite NASA (GIBS) -->
+                    <div class="hidden" id="mapa-nasa-vista">
+                        <div class="mapa" id="mapa-nasa-caja">
+                            <div id="mapa-nasa" class="mapa-lienzo"></div>
+                            <div class="mapa-barra arriba-izq" role="group" aria-label="Capas NASA">
+                                <button type="button" class="pildora" data-nasa="imerg" aria-pressed="true" title="Lluvia medida por satélite cada 30 min (GPM IMERG)"><i class="fa-solid fa-cloud-rain"></i> Lluvia</button>
+                                <button type="button" class="pildora" data-nasa="nubes" aria-pressed="true" title="Foto real de nubes del día (MODIS / VIIRS)"><i class="fa-solid fa-cloud"></i> Nubes</button>
+                            </div>
+                            <div class="mapa-reloj arriba-der" id="nasa-reloj">—</div>
+                            <div class="mapa-leyenda escala abajo-izq" id="nasa-escala"></div>
+                        </div>
+                        <div class="reproductor">
+                            <button type="button" class="btn btn-primary btn-redondo" id="nasa-play" aria-label="Reproducir"><i class="fa-solid fa-play"></i></button>
+                            <input type="range" id="nasa-slider" min="0" max="47" value="47" aria-label="Hora de la imagen">
+                            <div class="segmented" role="group" aria-label="Satélite de nubes">
+                                <button type="button" data-sat="MODIS_Terra" aria-pressed="true">Terra</button>
+                                <button type="button" data-sat="MODIS_Aqua" aria-pressed="false">Aqua</button>
+                                <button type="button" data-sat="VIIRS_SNPP" aria-pressed="false">VIIRS</button>
+                            </div>
+                        </div>
+                        <div class="fuente-dato"><i class="fa-solid fa-circle-info"></i> NASA GIBS · lluvia GPM IMERG (cada 30 min, ~7 h de retraso) · nubes del día anterior</div>
+                    </div>
+
+                    <!-- Vista 4: Windy -->
+                    <div class="hidden" id="mapa-windy-vista">
+                        <div class="mapa" id="mapa-windy"></div>
+                        <div class="fuente-dato"><i class="fa-solid fa-circle-info"></i> Windy · modelo ECMWF · pronóstico animado de lluvia</div>
+                    </div>
                 </div>
 
                 <div class="panel">
-                    <div class="panel-cab"><h2>Pronóstico por punto (mm de lluvia al día)</h2><span class="muted">Probabilidad debajo del valor</span></div>
+                    <div class="panel-cab"><h2><i class="fa-solid fa-table-cells icono-titulo"></i> mm por día</h2><span class="chip">% = probabilidad</span></div>
                     <div class="panel-cuerpo tabla-wrap"><table class="matriz" id="matriz"></table></div>
                 </div>
 
                 <div class="grid-2">
                     <div class="panel">
-                        <div class="panel-cab"><h2>Caudal modelado del río Ica</h2><span class="muted">m³/s · GloFAS</span></div>
+                        <div class="panel-cab"><h2><i class="fa-solid fa-water icono-titulo"></i> Caudal del río Ica</h2><span class="chip">m³/s · GloFAS</span></div>
                         <div class="panel-cuerpo">
                             <div class="grafico bajo"><canvas id="graf-rio"></canvas></div>
                             <p class="small muted" id="rio-nota" style="margin-top:10px"></p>
                         </div>
                     </div>
-                    <div class="panel">
-                        <div class="panel-cab"><h2>Cómo se calcula la llegada</h2></div>
+                    <details class="panel desplegable">
+                        <summary class="panel-cab"><h2><i class="fa-solid fa-calculator icono-titulo"></i> ¿Cómo se calcula?</h2><i class="fa-solid fa-chevron-down flecha"></i></summary>
                         <div class="panel-cuerpo metodo" id="metodo"></div>
-                    </div>
+                    </details>
                 </div>
             </section>
 
@@ -648,6 +709,26 @@
                         <button type="button" role="tab" data-tab="medios" aria-selected="false">Medios de pago</button>
                         <button type="button" role="tab" data-tab="puntos" aria-selected="false">Puntos de monitoreo</button>
                         <button type="button" role="tab" data-tab="auditoria" aria-selected="false">Bitácora</button>
+                        <button type="button" role="tab" data-tab="integraciones" aria-selected="false"><i class="fa-solid fa-plug"></i> Integraciones</button>
+                    </div>
+
+                    <!-- Integraciones: correo y Culqi -->
+                    <div class="panel-cuerpo integraciones hidden" data-tabpanel="integraciones">
+                        <article class="int-card">
+                            <header><span class="int-logo correo"><i class="fa-solid fa-envelope"></i></span><div><h3>Avisos por correo</h3><span class="small muted">Cada pago → correo a la Junta y al regante</span></div><span class="chip" id="int-correo-estado">…</span></header>
+                            <ul class="int-lista" id="int-correo-lista"></ul>
+                            <form id="form-correo-prueba" class="fila-flex" novalidate>
+                                <input name="email" type="email" class="input" placeholder="correo de prueba (opcional)" data-validar="email-opcional" maxlength="120" style="flex:1;min-width:180px">
+                                <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-paper-plane"></i> Enviar prueba</button>
+                            </form>
+                            <span class="error" data-error-de="email"></span>
+                        </article>
+                        <article class="int-card">
+                            <header><span class="int-logo culqi"><i class="fa-solid fa-credit-card"></i></span><div><h3>Culqi · Tarjeta y Yape</h3><span class="small muted">Llaves de prueba o producción</span></div><span class="chip" id="int-culqi-estado">…</span></header>
+                            <ul class="int-lista" id="int-culqi-lista"></ul>
+                            <div id="int-culqi-tarjetas"></div>
+                            <button type="button" class="btn btn-ghost btn-sm" id="btn-culqi-diag"><i class="fa-solid fa-stethoscope"></i> Volver a probar</button>
+                        </article>
                     </div>
 
                     <!-- Regantes -->
@@ -997,8 +1078,8 @@
 <div id="modales"></div>
 
 <!-- Librerías (versiones fijas) -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="vendor/chartjs/chart.umd.min.js"></script>
+<script src="vendor/leaflet/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <!-- Aplicación -->
 <script type="module" src="js/app.js"></script>

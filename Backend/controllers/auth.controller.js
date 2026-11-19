@@ -1,7 +1,7 @@
 const { query } = require('../Config/db');
 const config = require('../Config/env');
 const { verificarClave, verificarSenuelo, firmarToken } = require('../utils/seguridad');
-const { ErrorHttp, RE, limpiar } = require('../utils/validacion');
+const { ErrorHttp, RE, limpiar, rucValido, problemaEmail } = require('../utils/validacion');
 const auditoria = require('../services/auditoria.service');
 
 const MAX_INTENTOS = 5;
@@ -25,10 +25,11 @@ const mensajeBloqueo = hasta => {
 async function loginAdmin(req, res) {
     const email = limpiar(req.body?.email ?? '').toLowerCase();
     const pass = req.body?.pass ?? '';
-    if (!RE.email.test(email) || typeof pass !== 'string' || !pass || pass.length > 72) {
-        throw new ErrorHttp(400, 'Ingresa un correo y una contraseña válidos.', {
-            ...(!RE.email.test(email) ? { email: 'Correo no válido.' } : {}),
-            ...(!pass ? { pass: 'Ingresa tu contraseña.' } : {}),
+    const errEmail = problemaEmail(email);
+    if (errEmail || typeof pass !== 'string' || !pass || pass.length > 72) {
+        throw new ErrorHttp(400, errEmail || 'Ingresa tu contraseña.', {
+            ...(errEmail ? { email: errEmail } : {}),
+            ...(!pass ? { pass: 'Ingresa tu contraseña.' } : pass.length > 72 ? { pass: 'Contraseña demasiado larga.' } : {}),
         });
     }
 
@@ -59,9 +60,12 @@ async function loginCliente(req, res) {
     const pin = String(req.body?.pin ?? '').trim();
 
     const errores = {};
-    if (tipoDoc === 'DNI' && !RE.dni.test(documento)) errores.documento = 'El DNI debe tener 8 dígitos.';
-    else if (tipoDoc === 'RUC' && !RE.ruc.test(documento)) errores.documento = 'El RUC debe tener 11 dígitos y empezar con 10, 15, 16, 17 o 20.';
-    else if (!['DNI', 'RUC'].includes(tipoDoc)) errores.tipoDoc = 'Elige DNI o RUC.';
+    if (!['DNI', 'RUC'].includes(tipoDoc)) errores.tipoDoc = 'Elige DNI o RUC.';
+    else if (/\D/.test(documento)) errores.documento = `El ${tipoDoc} solo lleva números.`;
+    else if (tipoDoc === 'DNI' && documento.length !== 8) errores.documento = `El DNI tiene 8 dígitos (escribiste ${documento.length}).`;
+    else if (tipoDoc === 'RUC' && documento.length !== 11) errores.documento = `El RUC tiene 11 dígitos (escribiste ${documento.length}).`;
+    else if (tipoDoc === 'RUC' && !RE.ruc.test(documento)) errores.documento = 'El RUC empieza con 10, 15, 16, 17 o 20.';
+    else if (tipoDoc === 'RUC' && config.validarDigitoRuc && !rucValido(documento)) errores.documento = 'El RUC no es válido (revisa el último dígito).';
     if (pin && !RE.pin.test(pin)) errores.pin = 'El código tiene 6 dígitos.';
     if (Object.keys(errores).length) throw new ErrorHttp(400, 'Revisa los datos ingresados.', errores);
 

@@ -1,5 +1,6 @@
 const { query } = require('../Config/db');
 const clima = require('../services/clima.service');
+const lluvia = require('../services/lluvia.service');
 const { ErrorHttp, entero, limpiar, RE } = require('../utils/validacion');
 const auditoria = require('../services/auditoria.service');
 
@@ -9,6 +10,15 @@ async function resumen(req, res) {
         res.json(await clima.obtenerResumen({ forzar }));
     } catch (err) {
         throw new ErrorHttp(503, `El servicio de clima no está disponible ahora (${err.message}). Se reintentará automáticamente.`);
+    }
+}
+
+/** Malla horaria de lluvia (pasado 24 h + próximas 48 h) para la animación. */
+async function malla(req, res) {
+    try {
+        res.json(await lluvia.obtenerMalla({ forzar: req.query.forzar === '1' && req.sesion.tipo === 'usuario' }));
+    } catch (err) {
+        throw new ErrorHttp(503, `El pronóstico de lluvia no está disponible ahora (${err.message}).`);
     }
 }
 
@@ -79,4 +89,5 @@ async function historial(req, res) {
     res.json(rows);
 }
 
-module.exports = { resumen, listarPuntos, crearPunto, actualizarPunto, eliminarPunto, historial };
+module.exports = {
+    malla, resumen, listarPuntos, crearPunto, actualizarPunto, eliminarPunto, historial };

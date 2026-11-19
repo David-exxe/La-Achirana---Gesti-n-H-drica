@@ -181,10 +181,45 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .login-pie { position: relative; display: flex; gap: 28px; flex-wrap: wrap; font-size: 13px; color: #9db0c0; }
 .login-pie strong { display: block; font-family: var(--f-display); font-size: 22px; color: #e6edf2; font-weight: 650; }
 
-.login-form-lado { display: grid; place-items: center; padding: 40px 28px; background: var(--bg); }
-.login-card { width: 100%; max-width: 400px; display: grid; gap: 22px; }
-.login-card h2 { font-size: 26px; }
-.login-card .muted { margin-top: 4px; }
+.login-form-lado {
+    display: grid; place-items: center; padding: 40px 28px;
+    background: radial-gradient(90% 60% at 100% 0%, var(--agua-tint), transparent 60%), var(--bg);
+}
+.login-card {
+    width: 100%; max-width: 420px; display: grid; gap: 20px; padding: 30px 28px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, transparent), var(--surface));
+    border: 1px solid var(--line-strong); border-radius: 22px;
+    box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 30px 60px -30px rgba(0,0,0,.55);
+}
+.login-cabeza { display: grid; gap: 10px; justify-items: start; }
+.login-card h2 { font-size: 28px; letter-spacing: -.02em; }
+.login-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--agua); background: var(--agua-tint); border: 1px solid color-mix(in srgb, var(--agua) 30%, transparent);
+}
+.seg-login { padding: 5px; border-radius: 14px; }
+.seg-login button { display: grid; justify-items: center; gap: 2px; padding: 10px 6px; border-radius: 10px; transition: background .2s, color .2s, transform .15s; }
+.seg-login button i { font-size: 16px; opacity: .75; margin-bottom: 2px; }
+.seg-login button span { font-size: 14px; font-weight: 700; }
+.seg-login button small { font-size: 11px; font-weight: 500; color: var(--text-3); }
+.seg-login button[aria-pressed="true"] i { color: var(--agua); opacity: 1; }
+.seg-login button:active { transform: scale(.97); }
+.label-fila { display: flex; justify-content: space-between; align-items: baseline; }
+.label-fila label { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.contador { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text-3); transition: color .2s; }
+.contador.completo { color: var(--ok); font-weight: 700; }
+.input-icono { position: relative; }
+.input-icono > i:first-child { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 14px; pointer-events: none; }
+.input-icono .input { padding-left: 40px; padding-right: 40px; }
+.input-icono .marca-ok { position: absolute; right: 14px; top: 50%; transform: translateY(-50%) scale(.6); color: var(--ok); opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
+.input-icono.valido .marca-ok { opacity: 1; transform: translateY(-50%) scale(1); }
+.input-icono.valido .input:not([aria-invalid="true"]) { border-color: color-mix(in srgb, var(--ok) 55%, var(--line-strong)); }
+.input-doc { font-size: 18px; letter-spacing: .18em; }
+.btn-lg { padding: 13px 18px; font-size: 15px; border-radius: 12px; }
+.login-sellos { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; font-size: 12px; color: var(--text-3); }
+.login-sellos i { color: var(--agua); margin-right: 4px; }
+@media (max-width: 520px) { .login-card { padding: 22px 18px; border-radius: 18px; } }
 .tema-flotante { position: fixed; top: 14px; right: 14px; z-index: 30; }
 
 /* =====================================================================
@@ -371,8 +406,65 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
 .mapa-tabs { display: flex; gap: 4px; }
 .mapa { height: 460px; border-radius: 0 0 var(--r-panel) var(--r-panel); overflow: hidden; background: var(--bg-2); position: relative; }
 .mapa iframe { width: 100%; height: 100%; border: 0; display: block; }
-.mapa-controles { position: absolute; z-index: 500; top: 12px; right: 12px; display: grid; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; box-shadow: var(--shadow); max-width: 230px; }
-.mapa-controles .label { font-size: 12px; }
+/* ---------- Mapa y lluvia en movimiento ---------- */
+.mapa-lienzo { position: absolute; inset: 0; }
+.mapa .leaflet-container { background: var(--bg-2); font-family: var(--f-text); }
+.panel-mapa .mapa-tabs button i { margin-right: 6px; opacity: .8; }
+.icono-titulo { color: var(--agua); margin-right: 8px; font-size: .9em; }
+.arriba-izq { position: absolute; z-index: 500; top: 12px; left: 12px; }
+.abajo-izq { position: absolute; z-index: 500; bottom: 14px; left: 12px; }
+.mapa-barra { display: flex; gap: 6px; flex-wrap: wrap; }
+.pildora {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); cursor: pointer;
+    background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(8px);
+    color: var(--text-2); font-size: 12.5px; font-weight: 600; padding: 7px 12px; border-radius: 999px;
+    box-shadow: 0 6px 18px -10px rgba(0,0,0,.5); transition: background .15s, color .15s, border-color .15s;
+}
+.pildora:hover { color: var(--text); }
+.pildora[aria-pressed="true"] { background: var(--agua); color: #06222a; border-color: transparent; }
+.mapa-leyenda {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: calc(100% - 24px);
+    background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(8px);
+    border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; font-size: 12px; color: var(--text-2);
+}
+.mapa-leyenda span { display: inline-flex; align-items: center; gap: 5px; }
+.mapa-leyenda .punto, .kpi-mini .punto { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.mapa-leyenda .punto.cuadrado { border-radius: 2px; }
+.mapa-leyenda.escala b { font-weight: 700; color: var(--text); }
+.mapa-reloj {
+    display: grid; gap: 1px; padding: 8px 12px; border-radius: 12px; font-weight: 700; font-size: 14px;
+    background: color-mix(in srgb, var(--surface) 90%, transparent); backdrop-filter: blur(8px);
+    border: 1px solid var(--line-strong); font-variant-numeric: tabular-nums; text-transform: capitalize;
+}
+.mapa-reloj small { font-size: 11.5px; font-weight: 500; color: var(--text-3); text-transform: none; }
+.mapa-reloj .etq { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--agua); }
+.mapa-reloj .etq.ahora { color: var(--arena); }
+.mapa-reloj .etq.pasado { color: var(--text-3); }
+.mapa-cargando { position: absolute; inset: 0; z-index: 600; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 50%, transparent); font-size: 26px; color: var(--agua); }
+.capa-lluvia { image-rendering: auto; transition: opacity .2s; filter: saturate(1.15); }
+.kpis-lluvia { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 16px 0; }
+.kpi-mini { display: flex; gap: 10px; align-items: center; padding: 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+.kpi-mini > i { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 10px; background: var(--agua-tint); color: var(--agua); }
+.kpi-mini.alerta > i { background: var(--danger-tint); color: var(--danger); }
+.kpi-mini strong { display: block; font-family: var(--f-display); font-size: 19px; line-height: 1.1; }
+.kpi-mini strong small { font-size: 12px; font-weight: 500; color: var(--text-3); }
+.kpi-mini span { font-size: 11.5px; color: var(--text-3); }
+#mapa-lluvia-vista .mapa { margin-top: 14px; border-radius: 0; }
+.reproductor { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.reproductor input[type=range] { flex: 1; min-width: 140px; accent-color: var(--agua); height: 6px; }
+.btn-redondo { width: 42px; height: 42px; padding: 0; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.velocidad { padding: 3px; }
+.velocidad button { padding: 5px 9px; font-size: 12px; }
+.grafico-lluvia { height: 200px; padding: 12px 16px 4px; }
+.fuente-dato { font-size: 11.5px; color: var(--text-3); padding: 0 16px 14px; }
+.desplegable > summary { list-style: none; cursor: pointer; }
+.desplegable > summary::-webkit-details-marker { display: none; }
+.desplegable .flecha { transition: transform .2s; color: var(--text-3); }
+.desplegable[open] .flecha { transform: rotate(180deg); }
+@media (max-width: 760px) {
+    .kpis-lluvia { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mapa-leyenda.escala { font-size: 10.5px; gap: 6px; }
+}
 .leaflet-container { font-family: var(--f-text); background: var(--bg-2); }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
 .leaflet-popup-content { margin: 12px 14px; font-size: 13px; }
@@ -803,3 +895,35 @@ button.medio-card:hover, button.medio-card:focus-visible { transform: translateY
   .recibo-mini { grid-template-columns: 1fr; }
 }
 .pasos-pago li em { font-style: normal; }
+
+/* ---------- Integraciones (correo y Culqi) ---------- */
+.integraciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.int-card { display: grid; gap: 14px; align-content: start; padding: 18px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--line); }
+.int-card header { display: flex; gap: 12px; align-items: center; }
+.int-card header > div { flex: 1; min-width: 0; }
+.int-card h3 { font-size: 16px; }
+.int-logo { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 18px; flex: none; }
+.int-logo.correo { background: var(--agua-tint); color: var(--agua); }
+.int-logo.culqi { background: var(--arena-tint); color: var(--arena); }
+.int-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 13.5px; }
+.int-lista li { display: flex; gap: 8px; align-items: flex-start; }
+.int-lista li i { margin-top: 2px; }
+.int-lista li.ok i { color: var(--ok); }
+.int-lista li.mal i { color: var(--danger); }
+.int-lista li.neutro i { color: var(--text-3); }
+.chip.ok { background: var(--ok-tint); color: var(--ok); }
+.tarjetas-prueba { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.tarjetas-prueba > div { display: grid; gap: 2px; padding: 10px; border-radius: 10px; background: var(--bg-2); border: 1px dashed var(--line-strong); font-size: 12.5px; }
+.tarjetas-prueba small { color: var(--text-3); }
+
+/* ---------- Satélite NASA y Windy ---------- */
+.arriba-der { position: absolute; z-index: 500; top: 12px; right: 56px; }
+.capa-imerg { transition: opacity .25s; }
+#mapa-windy iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+#mapa-nasa-vista .mapa, #mapa-windy-vista .mapa { border-radius: 0; }
+.panel-mapa .mapa-tabs { flex-wrap: wrap; }
+@media (max-width: 760px) {
+    .panel-mapa .panel-cab { flex-wrap: wrap; gap: 10px; }
+    .panel-mapa .mapa-tabs { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+    .arriba-der { top: auto; bottom: 56px; right: 12px; }
+}
